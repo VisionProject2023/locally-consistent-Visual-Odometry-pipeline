@@ -5,6 +5,7 @@ A Markovian, asynchronous architecture is implemented
 
 
 The pipeline consists of the following segments:
+
 a - Initialization
     1 - Establish keypoint correspondences between 2 manually selected frames (using patch matching or KLT)
     2 - Triangulate a point cloud of 3D landmarks (implement RANSAC)
@@ -25,7 +26,7 @@ b - Continuous operation
 
         - class KeypointsToLandmarksAssociation
         (Associats keypoints to existing landmarks)
-        Input: previous frame I_i-1, previous state S_i-1, current frame I_i
+        Input: previous frame I_i-1, state of the previous frame S_i-1, current frame I_i
         Output: dictionary with keypoints in frame i, associated to already identified 3D points 
 
         - class NextPoseEstimator
@@ -37,11 +38,17 @@ b - Continuous operation
 
         - class NewLandmarksTriangulation
         (triangulates new landmarks, asynchronously)
-        Input:
+        Input: 
+        P_i (the set of key points)
+        X_i (the set of 3D landmarks)
+        C_i (set of candidate keypoints for current frame)
+        Fi (set containing the first observation of the tracked keypoints)
+        Tau_i (camera pose at the first observation of the keypoint)
         Output: list of new 3D points to add
         -> put into buffer
 
 
 Buffers: 
+
 1 - the state S_i-1 from the previous frame, (to do pose estimation, maintaining Markovian principle)
 2 - complete history of detected 3D landmarks (useful for mapping and loop closure)
