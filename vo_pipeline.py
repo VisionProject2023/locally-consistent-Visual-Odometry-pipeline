@@ -20,7 +20,7 @@ class BestVision():
         self.K = K
         self.previous_image = np.ndarray
         self.state = {'P' : np.ndarray, 'X' : np.ndarray}
-        self.candidate_keypoints = {'P' : np.ndarray, 'X' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
+        self.candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
     def initialize(frame_sequence: np.ndarray) -> np.ndarray:
         '''
