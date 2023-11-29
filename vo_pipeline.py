@@ -6,6 +6,7 @@ class BestVision():
     This class contains the entire pipeline. We can consider adding more attributes in order to store a 
     complete map of the track as well as the complete trajectory. We can also add stuff for the 0.5 feature
     '''
+
     def __init__(self, K: np.ndarray):
         '''
         This method builds the object and creates the attributes the we are going to use. In particular we store the last image received and a state dictionary which contains
@@ -20,7 +21,7 @@ class BestVision():
         self.K = K
         self.previous_image = np.ndarray
         self.state = {'P' : np.ndarray, 'X' : np.ndarray}
-        self.candidate_keypoints = {'P' : np.ndarray, 'X' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
+        self.candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
     def initialize(frame_sequence: np.ndarray) -> np.ndarray:
         '''
