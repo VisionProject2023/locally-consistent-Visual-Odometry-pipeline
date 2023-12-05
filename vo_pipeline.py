@@ -1,5 +1,6 @@
 
 import numpy as np
+import cv2 as cv
 
 class BestVision():
     '''
@@ -9,9 +10,9 @@ class BestVision():
 
     def __init__(self, K: np.ndarray):
         '''
-        This method builds the object and creates the attributes the we are going to use. In particular we store the last image received and a state dictionary which contains
+        This method builds the object and creates the attributes we are going to use. In particular we store the last image received and a state dictionary which contains
         information about the 3D landmarks that we identified in the previous step (the state refers only to the previous step since the 
-        pipeline has tobe markovian). We also store the candidate_keypoints that will be used in order to generate new 3D landmarks whenever possible.
+        pipeline has to be markovian). We also store the candidate_keypoints that will be used in order to generate new 3D landmarks whenever possible.
         
         Inputs:
             K: 3x3 np.ndarray of intrinsic parameters
@@ -129,7 +130,7 @@ class LandmarkTriangulator():
         self.K = K
         pass
 
-    def triangulateLandmark(self, candidate_keypoints: dict, frame: np.ndarray, features: np.ndarray) -> dict:
+    def triangulateLandmark(self, candidate_keypoints: dict, old_frame: np.ndarray, new_frame: np.ndarray, features: np.ndarray, new_candidates, cur_pose) -> dict:
         '''
         Inputs:
             candidate_keypoints: dict as defined in the main class
@@ -139,4 +140,34 @@ class LandmarkTriangulator():
         Output:
             new_landmarks: dictionary with keys 'P' and 'X'  for the new identified landmarks
         '''
+
+        # DIRE A NICOLA DI PASSARMI cur_pose !!!
+        # ATTENZIONE: costruire candidate_keypoints['T'] come un vettore di tre dimensioni (K,4,4) !!!
+
+
+        # new_candidates sono i nuovi keypoints individuati da ricky nella cur_frame e NON presenti nelle frame precedenti
+        # => SPIEGARE A RICKY COME FARSELI PASSARE: direi che può semplicemente passare una lista di questi new_candidates
+        # che trova prendendo i keypoints di cur_frame che non hanno corrispondenza nella prec_frame 
+        # ATTENZIONE: ogni volta vengono inseriti tutti in new_candidates tutti i keyframe che non sono ancora stati
+        # validati, poi IO procedo a valutare se sono effettivamente nuovi o se erano già stati individuati ma NON ANCORA 
+        # validati 
+        
+        # procedo a valutare quali di questi di new_candidates erano già stati precedentemente tracciati e quali invece sono
+        # nuovi. Procedo inoltre ad eliminare i candidate_points che non sono stati re-individuati.
+        
+        # -> trovo i candidate points che sono tracciati da prev_frame a cur_frame
+        _, tracked_old_idx, tracked_new_idx = np.intersect1d(candidate_keypoints['C'], new_candidates)
+        # -> elimino da candidate_points tutti i punti che non vengono poi tracciati
+        candidate_keypoints['C'] = candidate_keypoints['C'][tracked_old_idx]
+        candidate_keypoints['F'] = candidate_keypoints['F'][tracked_old_idx]
+        candidate_keypoints['T'] = candidate_keypoints['T'][tracked_old_idx]
+        # -> aggiungo ai candidate_points tutti i nuovi punti individuati
+        new_idx = np.setdiff1d(new_candidates, candidate_keypoints['C'], axis=0)
+        num_new_points = len(new_idx)
+        candidate_keypoints['C'] = np.concatenate((new_candidates[tracked_new_idx], new_candidates[new_idx]), axis = 0)
+        candidate_keypoints['F'] = np.concatenate((candidate_keypoints['F'], new_candidates[new_idx]), axis = 0)
+        candidate_keypoints['T'] = np.concatenate((candidate_keypoints['T'], np.tile(cur_pose, (num_new_points, 1, 1))), axis = 0)
+
         pass
+
+        
