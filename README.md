@@ -8,7 +8,7 @@ The pipeline consists of the following segments:
 
 a - Initialization
     1 - Establish keypoint correspondences between 2 manually selected frames (using patch matching or KLT)
-    2 - Triangulate a point cloud of 3D landmarks (implement RANSAC)
+    2 - Triangulate a point cloud of 3D landmarks (implement 5-point or 8-point algorithm, 2D-2D)
 
     Classes:
     - class Initialization
