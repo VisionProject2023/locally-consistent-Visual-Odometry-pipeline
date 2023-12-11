@@ -1,5 +1,6 @@
 
 import numpy as np
+import cv2 
 
 class BestVision():
     '''
@@ -97,8 +98,43 @@ class KeypointsToLandmarksAssociator():
             associations: dictinary with keys 'P' and 'i'. associations['P'] contains 2D points from new_frame associated with previous landmarks
                           and associations['i'] contains list of indices to which the points are associated
         '''
-        pass
+        #function to use cv2.calcOpticalFlowPyrLK()
+        #input: 
+        #       prevImage
+        #       nextImage
+        #       prevPts -> vector of 2d points to track
+        #Output:
+        #       nextPts -> vector of 2D points containing the calculated new 
+        #                  positions of input features in the second image
+        #       status -> vector with 1 if corresponding feature has been found, 0 if not
+        #       error -> output vector of errors
 
+        next_points, status, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, state['P'])
+
+        #remove outliers
+        #we are seeing a car like vehichle, so we can exploit the 1 point ransac:
+        # I imagine a 2 x N array
+        #thetas should be a 1 x N array
+        thetas = -2 * np.arctan((next_points[0,:]-state['P'][0,:])/(next_points[1,:]-state['P'][1,:]))
+        #we generate all the possible thetas, and then generate an histogram
+        hist = np.histogram(thetas)
+        theta_max = np.median(hist)
+        R = np.array([np.cos(theta_max), - np.sin(theta_max), 0],
+                     [np.sin(theta_max),   np.cos(theta_max), 0],
+                     [0 ,                0,                   1])
+        #the paper (Scaramuzza) says that I can set rho to  1
+        T =np.array([np.cos(theta_max/2), np.sin(theta_max/2), 0]).T
+        #reprojection error:
+        projected_points = (np.vstack[(R,T)] @ np.vstack((state['P'], np.ones_like(state['P'].shape[0]))))[:,0:2]
+        error_threshold = 1 #error threshold of one pixel
+        filter = next_points[np.linalg.norm(next_points - projected_points )<error_threshold]
+
+        #return new status and connection
+        new_P = state['X'][status]
+        new_P_error_free = new_P[filter]
+        new_state = {'P': new_P_error_free, 'X':next_points[filter]}
+
+        return new_state
 
 
 class PoseEstimation():
