@@ -24,9 +24,14 @@ b - Continuous operation
     Classes:
     Master Class processFrame()
 
+        - class FeatureExtraction
+        (performs feature extraction between 2 frames)
+        Input: previous frame I_i-1, state of the previous frame S_i-1, current frame I_i
+        Output: list of features
+
         - class KeypointsToLandmarksAssociation
         (Associats keypoints to existing landmarks)
-        Input: previous frame I_i-1, state of the previous frame S_i-1, current frame I_i
+        Input: previous frame I_i-1, state of the previous frame S_i-1, current frame I_i, list of features
         Output: dictionary with keypoints in frame i, associated to already identified 3D points 
 
         - class NextPoseEstimator
