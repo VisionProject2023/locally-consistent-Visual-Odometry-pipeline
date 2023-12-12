@@ -1,6 +1,7 @@
 
 import numpy as np
-import cv2 
+from typing import Dict
+import cv2
 
 
 class BestVision():
@@ -23,7 +24,7 @@ class BestVision():
         self.K = K
         self.previous_image = np.ndarray
         self.state = {'P' : np.ndarray, 'X' : np.ndarray}
-        self.candidate_keypoints = {'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
+        self.candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
     def initialize(frame_sequence: np.ndarray) -> np.ndarray:
         '''
@@ -139,25 +140,39 @@ class KeypointsToLandmarksAssociator():
         return new_state
 
 
-class PoseEstimation():
+class PoseEstimator():
     def __init__(self, K):
         '''
         Initialize class
         '''
         self.K = K
-        pass
+
+        """ Constants """
+        self.REPOJ_THRESH = 3
     
-    def estimatePose(self, associations: dict) -> np.ndarray:
+    def estimatePose(self, associations: Dict[np.ndarray,np.ndarray]) -> np.ndarray:
         '''
         Computes the current pose from the associations found in previous steps
 
         Inputs:
-            associations: dictionary with keys 'P' and 'i' that contain 2D points from the new frame and the corresponding matching in the state vector
+            associations: dictionary with keys 'P' and 'X_old' that contain 2D points from the new frame and the corresponding matching in the state vector
 
         Outputs:
-            T: 4x4 np.ndarray representing the pose of the new frame with respect to the previous one
+            T: 4x4 np.ndarray representing the pose of the new frame with respect to the world frame
         '''
-        pass
+        success, R, t, inliers = cv2.solvePnpRansac(objectPoints = associations['X_old'], 
+                                  imagePoints = associations['P'],
+                                  cameraMatrix = self.K,
+                                  distCoeffs = None,
+                                  flags=cv2.SOLVEPNP_P3P,
+                                  confidence=0.9999 ,
+                                  reprojectionError=self.REPOJ_THRESH)
+        
+        T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([0,0,0,1])], axis=0)
+        return T
+
+
+        
 
 class LandmarkTriangulator():
     def __init__(self, K):
