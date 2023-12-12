@@ -1,6 +1,6 @@
 import types
 import numpy as np
-
+#import matplotlib.pyplot as plt
 from typing import Dict
 import cv2
 
@@ -68,7 +68,6 @@ class VOInitializer():
         T: 4x4 np.ndarray representing pose
         S: dictionary with keypoints 'P' (keys) and 3D landmarks 'X' (values)
     '''
-
     
     def __init__(self, K):
         '''
@@ -77,7 +76,7 @@ class VOInitializer():
         self.K = K
 
 
-    def detect_corresponding_keypoints(self, frame1: np.ndarray, frame2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def get_keypoint_matches(self, frame1: np.ndarray, frame2: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         ''' Match keypoints between two frames using ORB feature detector and (sparse) KLT tracking'''
         
 
@@ -91,33 +90,44 @@ class VOInitializer():
         
         # SIFT corner descriptor
         sift = cv2.SIFT_create()
-        sift.compute(frame1, kps_f1)
-        sift.compute(frame2, kps_f2)
+        des1 = sift.compute(frame1, kps_f1)
+        des2 = sift.compute(frame2, kps_f2)
         
-        # Feature matching (compare the descriptors)
-        
+        # Feature matching (compare the descriptors, brute force)
+        bf = cv2.BFMatcher.create(cv2.NORM_L2, crossCheck=False) # crossCheck=True is an alternative to the ratiotest (proposed by D. Lowe in SIFT paper)	
+        kp_matches = bf.knnMatch(des1, des2, k=2) # k=2: return the two best matches for each descriptor
 
-        #optional: implement/use ORB detector (which is fast and rotation invariant, but not very robust to noise)
+        # Apply ratio test (preventing false matches)
+        good_kp_matches = []
+        for m,n in kp_matches:
+            if m.distance < 0.8*n.distance: # "distance" = distance function = how similar are the descriptors
+                good_kp_matches.append([m])
+        
+        # Optional features:
+        # - (computational efficiency): implement FLANN (Fast Library for Approximate Nearest Neighbors) matcher
+        # - implement/use ORB detector (which is fast and rotation invariant, but not very robust to noise)
         # orb = cv2.ORB_create()
     
-        # Optional KLT implementation
-        kps_f1_KLT = cv2.KeyPoint_convert(kps_f1) # Convert to Point2f format for KLT tracker
+        # # Optional KLT implementation
+        # kps_f1_KLT = cv2.KeyPoint_convert(kps_f1) # Convert to Point2f format for KLT tracker
         
-        # The KLT tracker will match the keypoints of the first frame with corresponding keypoints of the second frame
-        # Parameters for KLT tracker
-        lk_params = dict(winSize=(15, 15),
-                         maxLevel=2,
-                         criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+        # # The KLT tracker will match the keypoints of the first frame with corresponding keypoints of the second frame
+        # # Parameters for KLT tracker
+        # lk_params = dict(winSize=(15, 15),
+        #                  maxLevel=2,
+        #                  criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
-        # Applying KLT tracker
-        kps_f2_KLT, st, err = cv2.calcOpticalFlowPyrLK(frame1, frame2, kps_f1_KLT, None, **lk_params)
+        # # Applying KLT tracker
+        # kps_f2_KLT, st, err = cv2.calcOpticalFlowPyrLK(frame1, frame2, kps_f1_KLT, None, **lk_params)
 
-        # Filter out good points
-        good_keypoints_new_frame = kps_f1_KLT[st]
-        good_keypoints_old_frame = kps_f2_KLT[st]
+        # # Filter out good points
+        # good_keypoints_new_frame = kps_f1_KLT[st]
+        # good_keypoints_old_frame = kps_f2_KLT[st]
 
         # return the good tracking points of the old and the new frame
-        return good_keypoints_old_frame, good_keypoints_new_frame
+        
+    
+        return good_kp_matches
 
     def estimate_pose(self, kps_f1, kps_f2) -> tuple[np.ndarray, np.ndarray]:
         '''
@@ -132,7 +142,6 @@ class VOInitializer():
 
         # The pose is always relative to the very first frame (which is the world frame)
         '''
-        
     
         # Use the 1-point RANSAC to remove the intial outliers (with a relatively big error treshold), now we have a low rate of outliers
         # Then, use the 8-point RANSAC to remove the remaining outliers (only one solution, more robust against noise, around the same computational speed as 5-point with a low amount of outliers)
@@ -157,8 +166,20 @@ class VOInitializer():
         # The 3D points are in the world frame
         '''
         
+        # use CV2, triangulatePoints() to triangulate the 2D-2D correspondences
         
-        pass
+        
+        
+    def VO_initializer(self,):
+       
+        # first pose starts at zero 
+        #pose1 = 
+        
+        
+        # get keypoint matches
+        
+        # get the keypoints to 3D landmarks
+        Landmarks3D =cv2.triangulatePoints(pose1, pose2, pts1, pt2)
 
 
 
