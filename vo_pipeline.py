@@ -22,7 +22,7 @@ class BestVision():
         self.K = K
         self.previous_image = np.ndarray
         self.state = {'P' : np.ndarray, 'X' : np.ndarray}
-        self.candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
+        self.candidate_keypoints = {'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
     def initialize(frame_sequence: np.ndarray) -> np.ndarray:
         '''
@@ -130,7 +130,7 @@ class LandmarkTriangulator():
         self.K = K
         pass
 
-    def triangulateLandmark(self, candidate_keypoints: dict, old_frame: np.ndarray, new_frame: np.ndarray, features: np.ndarray, new_candidates, cur_pose) -> dict:
+    def triangulateLandmark(self, candidate_keypoints: dict, old_frame: np.ndarray, cur_frame: np.ndarray, features: np.ndarray, state, new_candidates_list, cur_pose) -> dict:
         '''
         Inputs:
             candidate_keypoints: dict as defined in the main class
@@ -154,20 +154,50 @@ class LandmarkTriangulator():
         
         # procedo a valutare quali di questi di new_candidates erano già stati precedentemente tracciati e quali invece sono
         # nuovi. Procedo inoltre ad eliminare i candidate_points che non sono stati re-individuati.
-        
-        # -> trovo i candidate points che sono tracciati da prev_frame a cur_frame
-        _, tracked_old_idx, tracked_new_idx = np.intersect1d(candidate_keypoints['C'], new_candidates)
-        # -> elimino da candidate_points tutti i punti che non vengono poi tracciati
-        candidate_keypoints['C'] = candidate_keypoints['C'][tracked_old_idx]
-        candidate_keypoints['F'] = candidate_keypoints['F'][tracked_old_idx]
-        candidate_keypoints['T'] = candidate_keypoints['T'][tracked_old_idx]
-        # -> aggiungo ai candidate_points tutti i nuovi punti individuati
-        new_idx = np.setdiff1d(new_candidates, candidate_keypoints['C'], axis=0)
-        num_new_points = len(new_idx)
-        candidate_keypoints['C'] = np.concatenate((new_candidates[tracked_new_idx], new_candidates[new_idx]), axis = 0)
-        candidate_keypoints['F'] = np.concatenate((candidate_keypoints['F'], new_candidates[new_idx]), axis = 0)
-        candidate_keypoints['T'] = np.concatenate((candidate_keypoints['T'], np.tile(cur_pose, (num_new_points, 1, 1))), axis = 0)
 
+
+        # TRACK CANDIDATE KEYPOINTS
+        p0 = candidate_keypoints['C']
+        p1, st, err = cv.calcOpticalFlowPyrLK(old_frame, cur_frame, p0, None)
+        if p1 is not None:
+            good_new = p1[st==1]
+            good_old = p0[st==1]
+        
+
+        # REMOVE CANDIDATE KEYPOINTS THAT HAVE NOT BEEN RETRACKED
+        bad_old = p0[st==0]
+        # Create a boolean mask to identify the positions of elements to be removed
+        mask = np.isin(candidate_keypoints['C'], bad_old)
+        # Get the indices of elements to be removed
+        indices_to_remove = np.where(mask)[0]
+        # Check if any elements are found before attempting removal
+        if indices_to_remove.size > 0:
+            # Remove the elements using boolean indexing
+            candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_remove)
+            candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_remove)
+            candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_remove)
+
+
+        # ADD NEW CANDIDATE KEYPOINTS THAT HAVE NEWLY BEEN TRACKED
+        new_candidates = {}
+        new_candidates['C'] = new_candidates_list
+        new_candidates['F'] = new_candidates_list
+        new_candidates['T'] = np.stack([(np.eye(4) @ cur_pose) for _ in range(len(new_candidates_list))])
+
+        candidate_keypoints['C'] = np.concatenate((candidate_keypoints['C'], new_candidates['C']))
+        candidate_keypoints['F'] = np.concatenate((candidate_keypoints['F'], new_candidates['F']))
+        candidate_keypoints['T'] = np.concatenate((candidate_keypoints['T'], new_candidates['T'])) 
+        
+
+        # UPDATE C OF CANDIDATE POINTS THAT HAVE BEEN RETRACKED
+        # Create a boolean mask to identify the positions of elements to be removed
+        mask = np.isin(candidate_keypoints['C'], good_old)
+        # Get the indices of elements to be removed
+        candidate_keypoints['C'][mask] = good_new
+        
+
+        # VALIDATE NEW POINTS
+  
         pass
 
         
