@@ -162,7 +162,9 @@ class LandmarkTriangulator():
         if p1 is not None:
             good_new = p1[st==1]
             good_old = p0[st==1]
-        
+        if len(good_old) != len(good_new):
+            print(f"ERRORE: good_old e good_new NON hanno la stessa lunghezza. len(good_old)={len(good_old)}!={len(good_new)}=len(good_new)")
+
 
         # REMOVE CANDIDATE KEYPOINTS THAT HAVE NOT BEEN RETRACKED
         bad_old = p0[st==0]
@@ -194,9 +196,11 @@ class LandmarkTriangulator():
         mask = np.isin(candidate_keypoints['C'], good_old)
         # Get the indices of elements to be removed
         candidate_keypoints['C'][mask] = good_new
-        
+    
 
         # VALIDATE NEW POINTS
+        
+
         
   
         pass
