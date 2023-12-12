@@ -115,6 +115,7 @@ class KeypointsToLandmarksAssociator():
         #we are seeing a car like vehichle, so we can exploit the 1 point ransac:
         # I imagine a 2 x N array
         #thetas should be a 1 x N array
+        #paper scaramuzza: https://rpg.ifi.uzh.ch/docs/IJCV11_scaramuzza.pdf
         thetas = -2 * np.arctan((next_points[0,:]-state['P'][0,:])/(next_points[1,:]-state['P'][1,:]))
         #we generate all the possible thetas, and then generate an histogram
         hist = np.histogram(thetas)
@@ -122,12 +123,12 @@ class KeypointsToLandmarksAssociator():
         R = np.array([np.cos(theta_max), - np.sin(theta_max), 0],
                      [np.sin(theta_max),   np.cos(theta_max), 0],
                      [0 ,                0,                   1])
-        #the paper (Scaramuzza) says that I can set rho to  1
+        #the paper (Scaramuzza) says that I can set rho to  1, see if it make sense with the reprojected points
         T =np.array([np.cos(theta_max/2), np.sin(theta_max/2), 0]).T
         #reprojection error:
         projected_points = (np.vstack[(R,T)] @ np.vstack((state['P'], np.ones_like(state['P'].shape[0]))))[:,0:2]
         error_threshold = 1 #error threshold of one pixel
-        filter = next_points[np.linalg.norm(next_points - projected_points )<error_threshold]
+        filter = next_points[np.linalg.norm(next_points - projected_points )< error_threshold]
 
         #return new status and connection
         new_P = state['X'][status]
