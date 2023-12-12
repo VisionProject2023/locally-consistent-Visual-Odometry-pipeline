@@ -2,6 +2,7 @@
 import numpy as np
 import cv2 
 
+
 class BestVision():
     '''
     This class contains the entire pipeline. We can consider adding more attributes in order to store a 
@@ -10,9 +11,9 @@ class BestVision():
 
     def __init__(self, K: np.ndarray):
         '''
-        This method builds the object and creates the attributes the we are going to use. In particular we store the last image received and a state dictionary which contains
+        This method builds the object and creates the attributes we are going to use. In particular we store the last image received and a state dictionary which contains
         information about the 3D landmarks that we identified in the previous step (the state refers only to the previous step since the 
-        pipeline has tobe markovian). We also store the candidate_keypoints that will be used in order to generate new 3D landmarks whenever possible.
+        pipeline has to be markovian). We also store the candidate_keypoints that will be used in order to generate new 3D landmarks whenever possible.
         
         Inputs:
             K: 3x3 np.ndarray of intrinsic parameters
@@ -22,7 +23,7 @@ class BestVision():
         self.K = K
         self.previous_image = np.ndarray
         self.state = {'P' : np.ndarray, 'X' : np.ndarray}
-        self.candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
+        self.candidate_keypoints = {'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
     def initialize(frame_sequence: np.ndarray) -> np.ndarray:
         '''
@@ -166,7 +167,7 @@ class LandmarkTriangulator():
         self.K = K
         pass
 
-    def triangulateLandmark(self, candidate_keypoints: dict, frame: np.ndarray, features: np.ndarray) -> dict:
+    def triangulateLandmark(self, candidate_keypoints: dict, old_frame: np.ndarray, cur_frame: np.ndarray, features: np.ndarray, state, new_candidates_list, cur_pose) -> dict:
         '''
         Inputs:
             candidate_keypoints: dict as defined in the main class
@@ -176,4 +177,65 @@ class LandmarkTriangulator():
         Output:
             new_landmarks: dictionary with keys 'P' and 'X'  for the new identified landmarks
         '''
+
+        # DIRE A NICOLA DI PASSARMI cur_pose !!!
+        # ATTENZIONE: costruire candidate_keypoints['T'] come un vettore di tre dimensioni (K,4,4) !!!
+
+
+        # new_candidates sono i nuovi keypoints individuati da ricky nella cur_frame e NON presenti nelle frame precedenti
+        # => SPIEGARE A RICKY COME FARSELI PASSARE: direi che può semplicemente passare una lista di questi new_candidates
+        # che trova prendendo i keypoints di cur_frame che non hanno corrispondenza nella prec_frame 
+        # ATTENZIONE: ogni volta vengono inseriti tutti in new_candidates tutti i keyframe che non sono ancora stati
+        # validati, poi IO procedo a valutare se sono effettivamente nuovi o se erano già stati individuati ma NON ANCORA 
+        # validati 
+        
+        # procedo a valutare quali di questi di new_candidates erano già stati precedentemente tracciati e quali invece sono
+        # nuovi. Procedo inoltre ad eliminare i candidate_points che non sono stati re-individuati.
+
+
+        # TRACK CANDIDATE KEYPOINTS
+        p0 = candidate_keypoints['C']
+        p1, st, err = cv2.calcOpticalFlowPyrLK(old_frame, cur_frame, p0, None)
+        if p1 is not None:
+            good_new = p1[st==1]
+            good_old = p0[st==1]
+        
+
+        # REMOVE CANDIDATE KEYPOINTS THAT HAVE NOT BEEN RETRACKED
+        bad_old = p0[st==0]
+        # Create a boolean mask to identify the positions of elements to be removed
+        mask = np.isin(candidate_keypoints['C'], bad_old)
+        # Get the indices of elements to be removed
+        indices_to_remove = np.where(mask)[0]
+        # Check if any elements are found before attempting removal
+        if indices_to_remove.size > 0:
+            # Remove the elements using boolean indexing
+            candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_remove)
+            candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_remove)
+            candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_remove)
+
+
+        # ADD NEW CANDIDATE KEYPOINTS THAT HAVE NEWLY BEEN TRACKED
+        new_candidates = {}
+        new_candidates['C'] = new_candidates_list
+        new_candidates['F'] = new_candidates_list
+        new_candidates['T'] = np.stack([(np.eye(4) @ cur_pose) for _ in range(len(new_candidates_list))])
+
+        candidate_keypoints['C'] = np.concatenate((candidate_keypoints['C'], new_candidates['C']))
+        candidate_keypoints['F'] = np.concatenate((candidate_keypoints['F'], new_candidates['F']))
+        candidate_keypoints['T'] = np.concatenate((candidate_keypoints['T'], new_candidates['T'])) 
+        
+
+        # UPDATE C OF CANDIDATE POINTS THAT HAVE BEEN RETRACKED
+        # Create a boolean mask to identify the positions of elements to be removed
+        mask = np.isin(candidate_keypoints['C'], good_old)
+        # Get the indices of elements to be removed
+        candidate_keypoints['C'][mask] = good_new
+        
+
+        # VALIDATE NEW POINTS
+        
+  
         pass
+
+        
