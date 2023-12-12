@@ -197,6 +197,7 @@ class LandmarkTriangulator():
         
 
         # VALIDATE NEW POINTS
+        
   
         pass
 
