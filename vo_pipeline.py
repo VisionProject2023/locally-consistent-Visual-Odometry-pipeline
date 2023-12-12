@@ -1,8 +1,8 @@
-
+import types
 import numpy as np
 import cv2
-from matplotlib import pyplot as plt
-import typing
+#from matplotlib import pyplot as plt
+
 
 class BestVision():
     '''
@@ -76,7 +76,7 @@ class VOInitializer():
         self.K = K
 
 
-    def detect_corresponding_keypoints(self, frame1: np.ndarray, frame2: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def detect_corresponding_keypoints(self, frame1: np.ndarray, frame2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         ''' Match keypoints between two frames using ORB feature detector and (sparse) KLT tracking'''
 
         # First, detect and describe keypoints in both frames
@@ -110,7 +110,7 @@ class VOInitializer():
         # return the good tracking points of the old and the new frame
         return good_keypoints_old_frame, good_keypoints_new_frame
 
-    def estimate_pose(self, points0, points1) -> Tuple[np.ndarray, np.ndarray]:
+    def estimate_pose(self, points0, points1) -> tuple[np.ndarray, np.ndarray]:
         '''
 
         # Now we have a set of 2D-2D correspondences between the two frames
