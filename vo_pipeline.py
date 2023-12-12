@@ -78,21 +78,29 @@ class VOInitializer():
 
     def detect_corresponding_keypoints(self, frame1: np.ndarray, frame2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         ''' Match keypoints between two frames using ORB feature detector and (sparse) KLT tracking'''
-
-        # First, detect and describe keypoints in both frames
-        # A possible descriptor is the ORB descriptor, which is fast and rotation invariant, but not very robust to noise
+        
 
         # Idea: the VOInitialization should be as accurate as possible, so we can use a more robust descriptor (e.g. SIFT or LIFT)
         # Idea: use ORB to find candidate keypoints, then use Tomasi corner detector
 
         # Initialize feauture detector and descriptor
-        # either use ORB or Shi-Tomasi detector
-        orb = cv2.ORB_create()
-        #shi_tomasi = cv2.s
+        # Shi-Tomashi corner detector
+        kps_f1 = cv2.goodFeaturesToTrack(frame1, maxCorners=100, qualityLevel=0.01, minDistance=10, mask=None, blockSize=3, gradientSize=3, useHarrisDetector=False, k=0.04)
+        kps_f2 = cv2.goodFeaturesToTrack(frame2, maxCorners=100, qualityLevel=0.01, minDistance=10, mask=None, blockSize=3, gradientSize=3, useHarrisDetector=False, k=0.04)
         
-        # Detect initial keypoints
-        kp0 = orb.detect(frame1, None)
-        p0 = cv2.KeyPoint_convert(kp0) # Convert to Point2f format for KLT tracker
+        # SIFT corner descriptor
+        sift = cv2.SIFT_create()
+        sift.compute(frame1, kps_f1)
+        sift.compute(frame2, kps_f2)
+        
+        # Feature matching (compare the descriptors)
+        
+
+        #optional: implement/use ORB detector (which is fast and rotation invariant, but not very robust to noise)
+        # orb = cv2.ORB_create()
+    
+        # Optional KLT implementation
+        kps_f1_KLT = cv2.KeyPoint_convert(kps_f1) # Convert to Point2f format for KLT tracker
         
         # The KLT tracker will match the keypoints of the first frame with corresponding keypoints of the second frame
         # Parameters for KLT tracker
@@ -101,16 +109,16 @@ class VOInitializer():
                          criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
         # Applying KLT tracker
-        p1, st, err = cv2.calcOpticalFlowPyrLK(frame1, frame2, p0, None, **lk_params)
+        kps_f2_KLT, st, err = cv2.calcOpticalFlowPyrLK(frame1, frame2, kps_f1_KLT, None, **lk_params)
 
         # Filter out good points
-        good_keypoints_new_frame = p1[st == 1]
-        good_keypoints_old_frame = p0[st == 1]
+        good_keypoints_new_frame = kps_f1_KLT[st]
+        good_keypoints_old_frame = kps_f2_KLT[st]
 
         # return the good tracking points of the old and the new frame
         return good_keypoints_old_frame, good_keypoints_new_frame
 
-    def estimate_pose(self, points0, points1) -> tuple[np.ndarray, np.ndarray]:
+    def estimate_pose(self, kps_f1, kps_f2) -> tuple[np.ndarray, np.ndarray]:
         '''
 
         # Now we have a set of 2D-2D correspondences between the two frames
@@ -124,11 +132,15 @@ class VOInitializer():
         # The pose is always relative to the very first frame (which is the world frame)
         '''
         
+    
+        # Use the 1-point RANSAC to remove the intial outliers (with a relatively big error treshold), now we have a low rate of outliers
+        # Then, use the 8-point RANSAC to remove the remaining outliers (only one solution, more robust against noise, around the same computational speed as 5-point with a low amount of outliers)
+        
         # Compute the essential matrix using the RANSAC 5-point algorithms (potentially 8-point to be more robust against noise)
-        E, mask = cv2.findEssentialMat(points0, points1, self.K, cv2.RANSAC, 0.999, 1.0, None)
+        E, mask = cv2.findEssentialMat(kps_f1, kps_f2, self.K, cv2.RANSAC, 0.999, 1.0, None)
 
         # Decompose the essential Matrix in possible rotations and translations (there are 4 possible solutions!)
-        _, R, t, _ = cv2.recoverPose(E, points1, points2, self.K)
+        _, R, t, _ = cv2.recoverPose(E, kps_1, kps_f2, self.K)
 
         # Form the transformation matrix
         T = np.eye(4)
@@ -143,6 +155,8 @@ class VOInitializer():
 
         # The 3D points are in the world frame
         '''
+        
+        
         pass
 
 
