@@ -1,13 +1,14 @@
 import os
 import numpy as np
 import cv2
+from vo_pipeline import *
 
 # Setup
 ds = 0  # 0: KITTI, 1: Malaga, 2: parking
 
 if ds == 0:
     # Set kitti_path to the folder containing "05" and "poses"
-    kitti_path = 'path_to_kitti_dataset'  # replace with your path
+    kitti_path = 'kitti'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
     last_frame = 4540
@@ -28,7 +29,7 @@ elif ds == 1:
 
 elif ds == 2:
     # Set parking_path to the folder containing parking dataset
-    parking_path = 'path_to_parking_dataset'  # replace with your path
+    parking_path = 'parking'  # replace with your path
     assert os.path.exists(parking_path), "Parking path does not exist"
     last_frame = 598
     K = np.loadtxt(f'{parking_path}/K.txt')
@@ -54,3 +55,11 @@ elif ds == 2:
 
 else:
     raise ValueError("Invalid dataset selection")
+
+
+# instantiate the VOInitializer
+VOInit = VOInitializer(K)
+
+initial_good_kp_matches = VOInit.get_keypoint_matches(img0, img1)
+
+#T_hom = VOInit.estimate_pose(initial_good_kp_matches)
