@@ -23,7 +23,7 @@ class BestVision():
     complete map of the track as well as the complete trajectory. We can also add stuff for the 0.5 feature
     '''
 
-    def __init__(self, K: np.ndarray):
+    def __init__(self, K: np.ndarray, last_frame: int):
         '''
         This method builds the object and creates the attributes we are going to use. In particular we store the last image received and a state dictionary which contains
         information about the 3D landmarks that we identified in the previous step (the state refers only to the previous step since the 
@@ -35,13 +35,15 @@ class BestVision():
         '''
 
         self.K = K # Intrinsic parameters, the camera is assumed to be calibrated
+        self.last_frame = last_frame
+        
         self.previous_image = np.ndarray
         self.state = {'P' : np.ndarray, 'X' : np.ndarray}
         self.state_with_candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
-    def initialize(frame_sequence: np.ndarray) -> np.ndarray:
+    def initialize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
         '''
-        Takes as input a sequence of frames, initializes the state and candidate_keypoints and returns the configuration of the second keyframe 
+        Initializes the state and returns the configuration of the second keyframe 
         with respect to the first frame which configuration is considered as the world frame. This function makes the choice of which frame to use 
         as second frame in initialization (for example the third frame in the sequence for th KITTY dataset as suggested)
 
@@ -53,7 +55,8 @@ class BestVision():
         '''
         
         
-
+        
+    
         pass
 
     def processFrame(new_frame: np.ndarray) -> np.ndarray:
@@ -168,7 +171,6 @@ class VOInitializer():
         # # Filter out good points
         # good_keypoints_new_frame = kps_f1_KLT[st]
         # good_keypoints_old_frame = kps_f2_KLT[st]
-        
 
     def get_pose_estimate(self, kps_f1: list, kps_f2: list) -> np.ndarray:
         '''
@@ -257,7 +259,6 @@ class KeypointsToLandmarksAssociator():
 
         return new_state
 
-
 class PoseEstimator():
     def __init__(self, K):
         '''
@@ -290,7 +291,6 @@ class PoseEstimator():
         return T
 
 
-        
 
 class LandmarkTriangulator():
     def __init__(self, K):
