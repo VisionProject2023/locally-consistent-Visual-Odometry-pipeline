@@ -37,7 +37,7 @@ class BestVision():
         self.K = K # Intrinsic parameters, the camera is assumed to be calibrated
         self.previous_image = np.ndarray
         self.state = {'P' : np.ndarray, 'X' : np.ndarray}
-        self.candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
+        self.state_with_candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
     def initialize(frame_sequence: np.ndarray) -> np.ndarray:
         '''
@@ -51,6 +51,8 @@ class BestVision():
         Outputs:
             T: 4x4 np.ndarray representing the transformation between the first frame and the second keyframe (for example the third in the image flow) 
         '''
+        
+        
 
         pass
 
@@ -89,8 +91,18 @@ class VOInitializer():
         '''
         self.K = K
 
-    def get_keypoint_matches(self, frame1: np.ndarray, frame2: np.ndarray) -> np.ndarray:
-        ''' Match keypoints between two frames using Shi_Tomashi feature detector and SIFT descriptor'''
+    def get_keypoint_matches(self, frame1: np.ndarray, frame2: np.ndarray) -> (np.array, np.array):
+        ''' 
+        Match keypoints between two frames using different detectors (default = SIFT) and the SIFT descriptor
+        
+        Args:
+            frame1: HxW np.ndarray
+            frame2: HxW np.ndarray
+        
+        Returns:
+            good_kps_f1: list of keypoints in frame1
+            good_kps_f2: list of keypoints in frame2
+        '''
 
         if config['init_detector_descriptor'] =='shi-tomasi-sift':
             
@@ -112,7 +124,7 @@ class VOInitializer():
             # this has to be figured out!
             
         if config['init_detector_descriptor'] == 'sift':
-            # All SIFT implementation:
+            # All SIFT implementat  ion:
             sift = cv2.SIFT.create()
             kps_f1, des1 = sift.detectAndCompute(frame1, None)
             kps_f2, des2 = sift.detectAndCompute(frame2, None)
@@ -128,21 +140,19 @@ class VOInitializer():
         kp_matches = bf.knnMatch(des1, des2, k=2) # k=2: return the two best matches for each descriptor
 
         # Apply ratio test (preventing false matches)
-        good_kps_f1 = []
-        good_kps_f2 = []
         good_kp_matches = []
         for m,n in kp_matches:
             if m.distance < 0.8*n.distance: # "distance" = distance function = how similar are the descriptors
-                good_kp_matches.append([m])
-                
+                good_kp_matches.append(m)
+                       
+        # convert kp matches to lists
+        good_kps_f1 = np.array([kps_f1[match.queryIdx].pt for match in good_kp_matches])
+        good_kps_f2 = np.array([kps_f2[match.trainIdx].pt for match in good_kp_matches])
+  
         # return the good tracking points of the old and the new frame
-        return good_kp_matches
-            
-        # Optional features:
-        # - (computational efficiency): implement FLANN (Fast Library for Approximate Nearest Neighbors) matcher
-        # - implement/use ORB detector (which is fast and rotation invariant, but not very robust to noise)
-        # orb = cv2.ORB_create()
-    
+        return good_kps_f1, good_kps_f2
+        
+        
         # # Optional KLT implementation
         # kps_f1_KLT = cv2.KeyPoint_convert(kps_f1) # Convert to Point2f format for KLT tracker
         
@@ -160,17 +170,23 @@ class VOInitializer():
         # good_keypoints_old_frame = kps_f2_KLT[st]
         
 
-    def estimate_pose(self, kps_f1, kps_f2) -> np.ndarray:
+    def get_pose_estimate(self, kps_f1: list, kps_f2: list) -> np.ndarray:
         '''
-        Estimatea the pose of the second frame based on the 2D-2D correspondences between the two frames
+        Estimatea the pose of the second frame based on the 2D-2D correspondences between the two frames (5-point RANSAC algorithm)
         The pose is always relative to the very first frame (which is the world frame)
+        
+        Args: 
+            kps_f1: list of keypoints in frame1
+            kps_f2: list of keypoints in frame2
+            
+        Returns: 
+            T_hom: 4x4 np.ndarray (homogeneous transformation matrix) representing the pose of frame2 with respect to frame1
         '''
         
-        # Idea: Use the 1-point RANSAC to remove the intial outliers (with a relatively big error treshold), now we have a low rate of outliers
-        # Then, use the 5-point RANSAC to remove the remaining outliers (5-point algorithm uses the epipolar geometry to compute the essential matrix
+        # Use the 5-point RANSAC to compute the essential matrix, taking outliers into account (5-point algorithm uses the epipolar geometry to compute the essential matrix)
         # But, the 5-point algorithms can return up to 10 solution of the essential matrix
 
-        # Compute the essential matrix using the RANSAC 8-point algorithms
+        # Compute the essential matrix using the RANSAC 5-point algorithms
         E, mask = cv2.findEssentialMat(kps_f1, kps_f2, self.K, cv2.RANSAC, 0.999, 1.0, None)
 
         # Given the essential matrix, 4 possible combinations of R and T are possile, but only one is in front of the camera (cheirality constraint)
@@ -181,11 +197,6 @@ class VOInitializer():
         T_hom[:3, :3] = R
         T_hom[:3, 3] = t.flatten()
         return T_hom 
-            
-        
-        #triangulate the 2D feature 3D landmarks
-        #Landmarks3D =cv2.triangulatePoints(pose1, pose2, pts1, pt2)
-
 
 
 class KeypointsToLandmarksAssociator():

@@ -60,6 +60,13 @@ else:
 # instantiate the VOInitializer
 VOInit = VOInitializer(K)
 
-initial_good_kp_matches = VOInit.get_keypoint_matches(img0, img1)
+# detect, describe and match features
+kps_1, kps2 = VOInit.get_keypoint_matches(img0, img1)
 
-#T_hom = VOInit.estimate_pose(initial_good_kp_matches)
+# estimate pose
+img1_img2_pose_tranform = VOInit.get_pose_estimate(kps_1, kps2)
+
+
+
+cv2.triangulatePoints(projMatr1, projMatr2, projPoints1, projPoints2)
+
