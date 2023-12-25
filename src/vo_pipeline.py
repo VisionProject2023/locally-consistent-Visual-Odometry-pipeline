@@ -192,11 +192,8 @@ class VOInitializer():
         # Given the essential matrix, 4 possible combinations of R and T are possile, but only one is in front of the camera (cheirality constraint)
         _, R, t, _ = cv2.recoverPose(E, kps_f1, kps_f2, self.K, mask=mask) #recoverPose enforces the 
 
-        # Homogenous transfor]mation matrix
-        T_hom = np.eye(4)
-        T_hom[:3, :3] = R
-        T_hom[:3, 3] = t.flatten()
-        return T_hom 
+        # Output transformation matrix (not homogeneous!)
+        return np.hstack((R, t))
 
 
 class KeypointsToLandmarksAssociator():
