@@ -62,7 +62,7 @@ bootstrap_frames = [0, 1]  # replace with your bootstrap frame indices
 
 if ds == 0:
     img0 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[0]:06d}.png', cv2.IMREAD_GRAYSCALE)
-    img1 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[1]:06d}.png', cv2.IMREAD_GRAYSCALE)
+    img1 = cv2.imread(f'{kitti_path}/05/image_0/{4:06d}.png', cv2.IMREAD_GRAYSCALE)
 
 elif ds == 1:
     img0 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[0]]}', cv2.IMREAD_GRAYSCALE)
@@ -98,37 +98,21 @@ m1 = K @ t_inv[0:3,:]
 starting_pose = np.hstack((np.eye(3), np.zeros((3,1))))
 m0 = K @ starting_pose
 Landmarks3D_H =cv2.triangulatePoints(m0, m1, kps1.T, kps2.T)
-Landmarks3D = Landmarks3D_H[0:3,:]
-print("punti 3d metodo 1")
-print(Landmarks3D[:,0:5])
+Landmarks3D = Landmarks3D_H[0:3,:]/Landmarks3D_H[3,:]
 #TODO resolve problems on the generation of points
-num_points = kps1.shape[0]
 
-# point_kps1_2 = np.hstack((kps1, np.zeros((num_points,1))))
-# point_kps2_2 = np.hstack((kps2, np.zeros((num_points,1))))
-# P = np.zeros((4, kps1.shape[0]))
-
-# # Linear Algorithm
-# for i in range(num_points):
-#     # Build matrix of linear homogeneous system of equations
-#     A1 = cross2Matrix((point_kps1_2.T)[:, i]) @ m0
-#     A2 = cross2Matrix((point_kps2_2.T)[:, i]) @ m1
-#     A = np.r_[A1, A2]
-
-#     # Solve the homogeneous system of equations
-#     _, _, vh = np.linalg.svd(A, full_matrices=False)
-#     P[:, i] = vh.T[:,-1]
-
-# # Dehomogenize (P is expressed in homoegeneous coordinates)
-# P /= P[3,:]
-
-plt.scatter(Landmarks3D[0,:], Landmarks3D[2,:], color='blue', marker='o', label='Points')
+filter = np.linalg.norm(Landmarks3D, axis = 0) < 4
+print("filter len ", filter.shape)
+Landmarks3D_filtered = Landmarks3D[:, filter]
+plt.scatter(Landmarks3D_filtered[0,:], Landmarks3D_filtered[2,:], color='blue', marker='o', label='Points')
 # plt.scatter(P[0,:], P[2,:], color='red', marker='o', label='Points')
 plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
 plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
 # Add labels and title
 plt.xlabel('X-axis')
 plt.ylabel('Z-axis')
+plt.ylim((0,10))
+plt.xlim((-5,5))
 plt.title('2D Points Visualization')
 
 # Show legend
@@ -137,10 +121,25 @@ plt.legend()
 # Show the plot
 plt.show()
 
+plt.imshow(img1)
+points = kps1[filter, :]
+print("size filtered points ", points.shape)
+plt.scatter(kps1[:,0], kps1[:,1], color='blue', marker='o', label='Points')
+plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Points')
+plt.plot()
+plt.show()
+
+plt.imshow(img1)
+points2 = kps2[filter,:]
+plt.scatter(kps2[:,0], kps2[:,1], color='blue', marker='o', label='Points')
+plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Points')
+plt.plot()
+plt.show()
+
 vision.update_state(kps2, Landmarks3D.T)
 
 if ds == 0:
-    img2 = cv2.imread(f'{kitti_path}/05/image_0/{2:06d}.png', cv2.IMREAD_GRAYSCALE)
+    img2 = cv2.imread(f'{kitti_path}/05/image_0/{5:06d}.png', cv2.IMREAD_GRAYSCALE)
 
 elif ds == 1:
     img2 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[2]]}', cv2.IMREAD_GRAYSCALE)

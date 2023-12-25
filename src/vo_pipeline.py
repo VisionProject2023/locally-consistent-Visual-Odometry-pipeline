@@ -237,24 +237,7 @@ class KeypointsToLandmarksAssociator():
         filter_status = np.hstack(status).astype(np.bool_)
         state_p_found = state['P'][filter_status]
         next_points = next_points[filter_status]
-        print("shape nextpoints ", next_points.shape)
-        for point in state_p_found:
-            cv2.circle(old_frame, (int(point[0]), int(point[1])), 5, (0, 255, 0), -1)  # Draw a filled green circle
-
-        # Display the image
-        cv2.imshow('Image with Points', old_frame)
-        cv2.waitKey(3000)
-        cv2.destroyAllWindows()
-
-        for point in next_points:
-            cv2.circle(new_frame, (int(point[0]), int(point[1])), 5, (0, 255, 0), -1)  # Draw a filled green circle
-
-        # Display the image
-        cv2.imshow('Image with Points', new_frame)
-        cv2.waitKey(3000)
-        cv2.destroyAllWindows()
-
-
+   
         #remove outliers
         #we are seeing a car like vehichle, so we can exploit the 1 point ransac:
         # I imagine a 2 x N array
@@ -282,30 +265,21 @@ class KeypointsToLandmarksAssociator():
         state_found_x = state['X'][filter_status]
         proj_points, jacob = cv2.projectPoints(state_found_x, hom_inv[0:3,0:3], hom_inv[0:3,3], self.K, None)
         proj_points = np.reshape(proj_points, (proj_points.shape[0], proj_points.shape[-1]))
-        print(proj_points[0:5,:])
-        print(next_points[0:5,:])
+        
+        print("drawing ......")
+        plt.imshow(old_frame)
+        filter3 = np.linalg.norm(next_points-proj_points, axis = 1) < 30
+        plt.scatter(proj_points[filter3,0], proj_points[filter3,1], color='blue', marker='o', label='Points')
+        plt.scatter(next_points[filter3,0], next_points[filter3,1], color='red', marker='o', label='Points')
+        plt.scatter(next_points[filter3,0], next_points[filter3,1], color='green', marker='o', label='Points')
+        # plt.xlim((0,1200))
+        plt.plot()
+        plt.show()
 
-        # matr1 = self.K @ np.hstack((R,T_i))
-        # print(np.hstack((R,T_i)))
-        # print("dimensione matrice 1 ", matr1.shape)
-        # print(state['X'].shape)
-        # state_found_x = state['X'][filter_status]
-        # matr2 = np.hstack((state_found_x, np.ones((state_p_found.shape[0],1)))).T
-        # print("dimensione matrice 2 ", matr2.shape)
-        # projected_points = (matr1 @ matr2)[0:2,:].T
-        # print(projected_points.T[0:5,:])
-        # print(next_points[0:5,:])
-        # error_threshold = 1 #error threshold of one pixel
-        # filter = np.linalg.norm(next_points - projected_points, axis= 1)< error_threshold
-        # print("len filter ", filter.shape)
-
-
-        #filter easy:
-        var = 1 * np.pi/180
-        filter2 = np.logical_and((thetas < theta_max + var),(thetas > theta_max - var))
         #return new status and connection
-        new_P_error_free = state_p_found[filter2]
-        new_state = {'P': new_P_error_free, 'X': next_points[filter2]}
+        new_P_error_free = state_p_found[filter3]
+        print("len P no error ", new_P_error_free.shape)
+        new_state = {'P': new_P_error_free, 'X': next_points[filter3]}
 
         return new_state
 
