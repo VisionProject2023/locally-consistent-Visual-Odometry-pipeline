@@ -1,0 +1,2 @@
+# initialization parameters
+init_detector_descriptor: 'sift'

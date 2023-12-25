@@ -1,14 +1,33 @@
+# %% 
+
 import os
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 from vo_pipeline import *
+
+def cross2Matrix(x):
+    """ Antisymmetric matrix corresponding to a 3-vector
+     Computes the antisymmetric matrix M corresponding to a 3-vector x such
+     that M*y = cross(x,y) for all 3-vectors y.
+
+     Input: 
+       - x np.ndarray(3,1) : vector
+
+     Output: 
+       - M np.ndarray(3,3) : antisymmetric matrix
+    """
+    M = np.array([[0,   -x[2], x[1]], 
+                  [x[2],  0,  -x[0]],
+                  [-x[1], x[0],  0]])
+    return M
 
 # Setup
 ds = 0  # 0: KITTI, 1: Malaga, 2: parking
 
 if ds == 0:
     # Set kitti_path to the folder containing "05" and "poses"
-    kitti_path = 'kitti'  # replace with your path
+    kitti_path = '../kitti'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
     last_frame = 4540
@@ -57,9 +76,82 @@ else:
     raise ValueError("Invalid dataset selection")
 
 
+#instantiate BestVision:
+vision = BestVision(K)
 # instantiate the VOInitializer
 VOInit = VOInitializer(K)
+# instantiate Landmark association
+associate = KeypointsToLandmarksAssociator(K)
 
-initial_good_kp_matches = VOInit.get_keypoint_matches(img0, img1)
+initial_good_kp_matches, kps1, kps2 = VOInit.get_keypoint_matches(img0, img1)
+# print(len(initial_good_kp_matches))
+# print(len(kps1))
+# print(len(kps2))
+# img3 = cv2.drawMatches(img0,kps1,img1,kps2,initial_good_kp_matches,None,flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+# plt.imshow(img3)
 
-#T_hom = VOInit.estimate_pose(initial_good_kp_matches)
+T_hom = VOInit.estimate_pose(kps1, kps2)
+t_inv = np.linalg.inv(T_hom)
+axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+print(t_inv[0:3,:])
+m1 = K @ t_inv[0:3,:]
+starting_pose = np.hstack((np.eye(3), np.zeros((3,1))))
+m0 = K @ starting_pose
+Landmarks3D_H =cv2.triangulatePoints(m0, m1, kps1.T, kps2.T)
+Landmarks3D = Landmarks3D_H[0:3,:]
+print("punti 3d metodo 1")
+print(Landmarks3D[:,0:5])
+#TODO resolve problems on the generation of points
+num_points = kps1.shape[0]
+
+# point_kps1_2 = np.hstack((kps1, np.zeros((num_points,1))))
+# point_kps2_2 = np.hstack((kps2, np.zeros((num_points,1))))
+# P = np.zeros((4, kps1.shape[0]))
+
+# # Linear Algorithm
+# for i in range(num_points):
+#     # Build matrix of linear homogeneous system of equations
+#     A1 = cross2Matrix((point_kps1_2.T)[:, i]) @ m0
+#     A2 = cross2Matrix((point_kps2_2.T)[:, i]) @ m1
+#     A = np.r_[A1, A2]
+
+#     # Solve the homogeneous system of equations
+#     _, _, vh = np.linalg.svd(A, full_matrices=False)
+#     P[:, i] = vh.T[:,-1]
+
+# # Dehomogenize (P is expressed in homoegeneous coordinates)
+# P /= P[3,:]
+
+plt.scatter(Landmarks3D[0,:], Landmarks3D[2,:], color='blue', marker='o', label='Points')
+# plt.scatter(P[0,:], P[2,:], color='red', marker='o', label='Points')
+plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
+plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
+# Add labels and title
+plt.xlabel('X-axis')
+plt.ylabel('Z-axis')
+plt.title('2D Points Visualization')
+
+# Show legend
+plt.legend()
+
+# Show the plot
+plt.show()
+
+vision.update_state(kps2, Landmarks3D.T)
+
+if ds == 0:
+    img2 = cv2.imread(f'{kitti_path}/05/image_0/{2:06d}.png', cv2.IMREAD_GRAYSCALE)
+
+elif ds == 1:
+    img2 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[2]]}', cv2.IMREAD_GRAYSCALE)
+
+elif ds == 2:
+    img2 = cv2.imread(f'{parking_path}/images/img_{bootstrap_frames[2]:05d}.png', cv2.IMREAD_GRAYSCALE)
+
+else:
+    raise ValueError("Invalid dataset selection")
+
+state_2 = associate.associateKeypoints(img1,img2,vision.state)
+
+
+# %%
