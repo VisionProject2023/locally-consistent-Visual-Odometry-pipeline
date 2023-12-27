@@ -76,8 +76,8 @@ class VOInitializer():
     '''
     Provides the functionality to initialize to Visual Odometry Pipeline
     1) estimating the pose of frame2 -> T
-        - (func) get_keypoint_matches -> keypoints
-        - (func) get_pose_estimate -> T
+        - (func) getKeypointMatches -> keypoints
+        - (func) getPoseEstimate -> T
         
     2) estimating the 3D landmarks -> S (state)
         - (func) get_3D_landmarks -> S
@@ -99,7 +99,7 @@ class VOInitializer():
         '''
         self.K = K
 
-    def get_keypoint_matches(self, frame1: np.ndarray, frame2: np.ndarray) -> (np.array, np.array):
+    def getKeypointMatches(self, frame1: np.ndarray, frame2: np.ndarray) -> (np.array, np.array):
         ''' 
         Match keypoints between two frames using different detectors (default = SIFT) and the SIFT descriptor
         
@@ -176,7 +176,7 @@ class VOInitializer():
         # good_keypoints_new_frame = kps_f1_KLT[st]
         # good_keypoints_old_frame = kps_f2_KLT[st]
 
-    def get_pose_estimate(self, kps_f1: list, kps_f2: list) -> np.ndarray:
+    def getPoseEstimate(self, kps_f1: list, kps_f2: list) -> np.ndarray:
         '''
         Estimatea the pose of the second frame based on the 2D-2D correspondences between the two frames (5-point RANSAC algorithm)
         The pose is always relative to the very first frame (which is the world frame)

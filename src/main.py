@@ -55,10 +55,10 @@ else:
 VOInit = VOInitializer(K)
 
 # detect, describe and match features
-kps_1, kps_2 = VOInit.get_keypoint_matches(img0, img1)
+kps_1, kps_2 = VOInit.getKeypointMatches(img0, img1)
 
 # estimate pose
-img1_img2_pose_tranform = VOInit.get_pose_estimate(kps_1, kps_2)
+img1_img2_pose_tranform = VOInit.getPoseEstimate(kps_1, kps_2)
 
 # triangulate landmarks
 state = VOInit.get_2D_3D_landmarks_association(kps_1, kps_2, img1_img2_pose_tranform)
