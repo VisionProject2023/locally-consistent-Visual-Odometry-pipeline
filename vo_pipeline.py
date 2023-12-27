@@ -1,6 +1,6 @@
 
 import numpy as np
-import cv2 as cv
+import cv2
 
 class BestVision():
     '''
@@ -141,24 +141,24 @@ class LandmarkTriangulator():
             new_landmarks: dictionary with keys 'P' and 'X'  for the new identified landmarks
         '''
 
-        # DIRE A NICOLA DI PASSARMI cur_pose !!!
-        # ATTENZIONE: costruire candidate_keypoints['T'] come un vettore di tre dimensioni (K,4,4) !!!
+        # TELL NICOLA TO PASS ME cur_pose !!!
+        # ATTENTION: construct candidate_keypoints['T'] as a three-dimensional vector (K,4,4) !!!
 
+        # new_candidates_list are the new keypoints identified by Ricky in the cur_frame and NOT present in the previous frames
+        # => EXPLAIN TO RICKY HOW TO PASS THEM: I would say he can simply pass a list of these new_candidates
+        # that he finds by taking the keypoints of cur_frame that have no correspondence in the prec_frame
+        # ATTENTION: every time all the keyframes that have not yet been
+        # validated are inserted in new_candidates, then I proceed to evaluate if they are actually new or if they had already been identified but NOT YET
+        # validated
 
-        # new_candidates sono i nuovi keypoints individuati da ricky nella cur_frame e NON presenti nelle frame precedenti
-        # => SPIEGARE A RICKY COME FARSELI PASSARE: direi che può semplicemente passare una lista di questi new_candidates
-        # che trova prendendo i keypoints di cur_frame che non hanno corrispondenza nella prec_frame 
-        # ATTENZIONE: ogni volta vengono inseriti tutti in new_candidates tutti i keyframe che non sono ancora stati
-        # validati, poi IO procedo a valutare se sono effettivamente nuovi o se erano già stati individuati ma NON ANCORA 
-        # validati 
-        
-        # procedo a valutare quali di questi di new_candidates erano già stati precedentemente tracciati e quali invece sono
-        # nuovi. Procedo inoltre ad eliminare i candidate_points che non sono stati re-individuati.
+        # I proceed to evaluate which of these new_candidates had already been previously tracked and which are
+        # new. I also proceed to remove the candidate_points that have not been re-identified
+
 
 
         # TRACK CANDIDATE KEYPOINTS
         p0 = candidate_keypoints['C']
-        p1, st, err = cv.calcOpticalFlowPyrLK(old_frame, cur_frame, p0, None)
+        p1, st, err = cv2.calcOpticalFlowPyrLK(old_frame, cur_frame, p0, None)
         if p1 is not None:
             good_new = p1[st==1]
             good_old = p0[st==1]
@@ -168,13 +168,13 @@ class LandmarkTriangulator():
 
         # REMOVE CANDIDATE KEYPOINTS THAT HAVE NOT BEEN RETRACKED
         bad_old = p0[st==0]
-        # Create a boolean mask to identify the positions of elements to be removed
+        # Create a boolean mask to identify the positions of candidate keypoints that have not been retracked
         mask = np.isin(candidate_keypoints['C'], bad_old)
         # Get the indices of elements to be removed
         indices_to_remove = np.where(mask)[0]
         # Check if any elements are found before attempting removal
         if indices_to_remove.size > 0:
-            # Remove the elements using boolean indexing
+            # Proceed to remove them
             candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_remove)
             candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_remove)
             candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_remove)
@@ -192,17 +192,61 @@ class LandmarkTriangulator():
         
 
         # UPDATE C OF CANDIDATE POINTS THAT HAVE BEEN RETRACKED
-        # Create a boolean mask to identify the positions of elements to be removed
+        # Create a boolean mask to identify the positions of the tracked candidate keypoints to be updated
         mask = np.isin(candidate_keypoints['C'], good_old)
-        # Get the indices of elements to be removed
+        # Update all the candidate keypoints that have been retracked
         candidate_keypoints['C'][mask] = good_new
     
 
         # VALIDATE NEW POINTS
-        
+        treshold = 5
+        indices_to_validate = []
+        # Consider all candidate keypoints
+        for idx in len(candidate_keypoints['C']):
+            # Compute the bearing vector corresponding to the current observation
+            uc, vc = candidate_keypoints['C'][idx]
+            wc = np.sqrt(uc**2 + vc**2 + 1)
+            vector_a = np.array([uc/wc, vc/wc, 1/wc])
+
+            # Compute the bearing vector corresponding to the first observation
+            uf, vf = candidate_keypoints['F'][idx]
+            wf = np.sqrt(uf**2 + vf**2 + 1)
+            vector_b = np.array([uf/wf, vf/wf, 1/wf])
+
+            # Compute the angle between the two bearing vectors
+            cos = np.dot(vector_a, vector_b) / (np.linalg.norm(vector_a) * np.linalg.norm(vector_b))
+            # Ensure the value is within the valid range for arccosine
+            cos = np.clip(cos, -1.0, 1.0)
+            # Calculate the angle
+            alpha = np.degrees(np.arccos(cos))
+
+            # Confront the angle with a treshold: if bigger, proceed to validate
+            if alpha > treshold:
+                indices_to_validate.append(idx)
+
+        for idx in indices_to_validate:
+            # Add homogeneous coordinates (1) to the 2D points
+            point1 = np.hstack((candidate_keypoints['C'][idx], np.array((1))))
+            point2 = np.hstack((candidate_keypoints['F'][idx], np.array((1))))
+            
+            # Triangulate the validated keypoint
+            point_3d_hom = cv2.triangulatePoints(cur_pose, candidate_keypoints['T'][idx], point1.T, point2.T)
+            # Convert homogeneous coordinates to 3D coordinates
+            point_3d = cv2.convertPointsFromHomogeneous(point_3d_hom.T).reshape(-1, 3)
+
+            # Add the validated keypoint to the state
+            state['P'].append(candidate_keypoints['C'][idx])
+            state['X'].append(point_3d)
+            
+
+        # Remove the validated keypoints from the candidate list
+        candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_validate)
+        candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_validate)
+        candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_validate)
+
 
         
-  
+
         pass
 
         
