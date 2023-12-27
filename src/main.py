@@ -14,6 +14,10 @@ if config['dataset'] == 'kitti':
     K = np.array([[718.856, 0, 607.1928],
                   [0, 718.856, 185.2157],
                   [0, 0, 1]])
+    
+    bootstrap_frames = [0, 2]
+    img0 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[0]:06d}.png', cv2.IMREAD_GRAYSCALE)
+    img1 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[1]:06d}.png', cv2.IMREAD_GRAYSCALE)
 
 elif config['dataset'] == 'malaga':
     # Set malaga_path to the folder containing Malaga dataset
@@ -25,6 +29,10 @@ elif config['dataset'] == 'malaga':
     K = np.array([[621.18428, 0, 404.0076],
                   [0, 621.18428, 309.05989],
                   [0, 0, 1]])
+    
+    bootstrap_frames = [0, 2]
+    img0 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[0]]}', cv2.IMREAD_GRAYSCALE)
+    img1 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[1]]}', cv2.IMREAD_GRAYSCALE)
 
 elif config['dataset'] == 'parking':
     # Set parking_path to the folder containing parking dataset
@@ -33,22 +41,8 @@ elif config['dataset'] == 'parking':
     last_frame = 598
     K = np.loadtxt(f'{parking_path}/K.txt')
     ground_truth = np.loadtxt(f'{parking_path}/poses.txt')[:, -9:-7]
-
-else:
-    raise ValueError("Invalid dataset selection")
-
-# Bootstrap
-bootstrap_frames = [0, 4]  # replace with your bootstrap frame indices -> will be determined by a keyframe criteria
-
-if config['dataset'] == 'kitti':
-    img0 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[0]:06d}.png', cv2.IMREAD_GRAYSCALE)
-    img1 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[1]:06d}.png', cv2.IMREAD_GRAYSCALE)
-
-elif config['dataset'] == 'malaga':
-    img0 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[0]]}', cv2.IMREAD_GRAYSCALE)
-    img1 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[1]]}', cv2.IMREAD_GRAYSCALE)
-
-elif config['dataset'] == 'parking':
+    
+    bootstrap_frames = [0, 2]
     img0 = cv2.imread(f'{parking_path}/images/img_{bootstrap_frames[0]:05d}.png', cv2.IMREAD_GRAYSCALE)
     img1 = cv2.imread(f'{parking_path}/images/img_{bootstrap_frames[1]:05d}.png', cv2.IMREAD_GRAYSCALE)
 
