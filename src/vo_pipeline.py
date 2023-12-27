@@ -228,6 +228,10 @@ class KeypointsToLandmarksAssociator():
         Initialize class
         '''
         self.K = K
+        #self.current_pose = current_pose
+        #in order to use the 1 point ransac I have to keep track of the last pose (pose of second frame 
+        # must be given in the init)
+
         pass
 
     def associateKeypoints(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict) -> dict:
@@ -257,6 +261,8 @@ class KeypointsToLandmarksAssociator():
         state['P'] = state['P'].astype(np.float32)
         next_points, status, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, state['P'], None)
         filter_status = np.hstack(status).astype(np.bool_)
+        filter_for_august = np.logical_not(filter_status)
+        next_point_for_august = next_points[filter_for_august]
         state_p_found = state['P'][filter_status]
         next_points = next_points[filter_status]
    
@@ -276,7 +282,8 @@ class KeypointsToLandmarksAssociator():
                      [np.sin(theta_max),   np.cos(theta_max), 0],
                      [0 ,                0,                   1]])
         #the paper (Scaramuzza) says that I can set rho to  1, see if it make sense with the reprojected points
-        T = 0.5 * np.array([np.cos(theta_max/2), np.sin(theta_max/2), 0])
+        rho = 0.2
+        T = rho * np.array([np.cos(theta_max/2), np.sin(theta_max/2), 0])
         #reprojection error:
         T_i = np.reshape(T,(T.shape[0],1))
         Hom = np.hstack((R,T_i))
@@ -302,6 +309,8 @@ class KeypointsToLandmarksAssociator():
         new_P_error_free = state_p_found[filter3]
         print("len P no error ", new_P_error_free.shape)
         new_state = {'P': new_P_error_free, 'X': next_points[filter3]}
+
+        #TODO update our current pose based on the Nicola function
 
         return new_state
     
