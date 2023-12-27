@@ -38,8 +38,8 @@ class BestVision():
         self.last_frame = last_frame
         
         self.previous_image = np.ndarray
-        self.state = {'P' : np.ndarray, 'X' : np.ndarray}
-        self.state_with_candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
+        self.state: Dict[(float, float), np.ndarray] = {} # 'P' (keypoints), 'X' (3D landmarks)
+        #self.state_with_candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
     def initialize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
         '''
@@ -51,10 +51,9 @@ class BestVision():
             frame_sequence: List[ HxW np.ndarray ] a list of all the frames (or just the first n)
 
         Outputs:
-            T: 4x4 np.ndarray representing the transformation between the first frame and the second keyframe (for example the third in the image flow) 
+            T: 4x4 np.ndarray representing pose (T = [R|t]])
+            S: dictionary with keypoints 'P' (keys) and 3D landmarks 'X' (values) 
         '''
-        
-        
         
     
         pass
@@ -70,21 +69,27 @@ class BestVision():
             T: 4x4 np.ndarray which encodes the new pose with respect to the world frame
         '''
         pass
-
+    
 
 class VOInitializer():
     
     '''
-    Compute the pose of frame2 with respect to frame1 and outputs 3D landmarks
+    Provides the functionality to initialize to Visual Odometry Pipeline
+    1) estimating the pose of frame2 -> T
+        - (func) get_keypoint_matches -> keypoints
+        - (func) get_pose_estimate -> T
+        
+    2) estimating the 3D landmarks -> S (state)
+        - (func) get_3D_landmarks -> S
     
-    The aim of the VOInitialization should be to estimate the pose of frame2 and 3D landmarks as accurate as possible
+    (we aim to make this estimation as accurate as possible)
 
     Inputs: 
         frame1: HxW np.ndarray
         frame2: HxW np.ndarray
 
     Outputs:
-        T: 4x4 np.ndarray representing pose
+        T: 4x4 np.ndarray representing pose (T = [R|t]])
         S: dictionary with keypoints 'P' (keys) and 3D landmarks 'X' (values)
     '''
     
@@ -103,8 +108,8 @@ class VOInitializer():
             frame2: HxW np.ndarray
         
         Returns:
-            good_kps_f1: list of keypoints in frame1
-            good_kps_f2: list of keypoints in frame2
+            good_kps_f1: array of keypoints in frame1
+            good_kps_f2: array of keypoints in frame2
         '''
 
         if config['init_detector_descriptor'] =='shi-tomasi-sift':
@@ -155,7 +160,6 @@ class VOInitializer():
         # return the good tracking points of the old and the new frame
         return good_kps_f1, good_kps_f2
         
-        
         # # Optional KLT implementation
         # kps_f1_KLT = cv2.KeyPoint_convert(kps_f1) # Convert to Point2f format for KLT tracker
         
@@ -182,7 +186,7 @@ class VOInitializer():
             kps_f2: list of keypoints in frame2
             
         Returns: 
-            T_hom: 4x4 np.ndarray (homogeneous transformation matrix) representing the pose of frame2 with respect to frame1
+            T: 3x4 np.ndarray (T = [R|t]) (transformation matrix) representing the pose of frame2 with respect to frame1 
         '''
         
         # Use the 5-point RANSAC to compute the essential matrix, taking outliers into account (5-point algorithm uses the epipolar geometry to compute the essential matrix)
@@ -196,6 +200,22 @@ class VOInitializer():
 
         # Output transformation matrix (not homogeneous!)
         return np.hstack((R, t))
+    
+    def get_2D_3D_landmarks_association(self, kps_1: np.ndarray, kps_2: np.ndarray, T_img1_img2: np.ndarray) -> Dict:
+        
+        # triangulate points
+        m1 = self.K @ np.eye(3, 4)
+        m2 = self.K @ T_img1_img2
+
+        # set the initial state of the VO pipeline 
+        state: Dict[tuple[np.ndarray, np.ndarray], np.ndarray] = {}
+        XH = cv2.triangulatePoints(m1, m2, kps_1.T, kps_2.T).T #triagulated points are stored in homogeneous coordinates
+        state = {tuple(map(tuple, key)): value[:3]/value[3] for key, value in zip(zip(kps_1, kps_2), XH)} #add 3D points to the state, convert to euclidean coordinates, converts kps into tuples
+
+        # this triangulated points can be made more accurate by minimizing the square reprojection error!
+        # -> feature to work on!
+        
+        return state
 
 
 class KeypointsToLandmarksAssociator():

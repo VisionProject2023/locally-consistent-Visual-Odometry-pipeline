@@ -50,6 +50,7 @@ else:
     raise ValueError("Invalid dataset selection")
 
 
+### 1 - Initialization
 # instantiate the VOInitializer
 VOInit = VOInitializer(K)
 
@@ -59,16 +60,10 @@ kps_1, kps_2 = VOInit.get_keypoint_matches(img0, img1)
 # estimate pose
 img1_img2_pose_tranform = VOInit.get_pose_estimate(kps_1, kps_2)
 
-# triangulate points
-m1 = K @ np.eye(3, 4)
-m2 = K @ img1_img2_pose_tranform
+# triangulate landmarks
+state = VOInit.get_2D_3D_landmarks_association(kps_1, kps_2, img1_img2_pose_tranform)
 
-# this implementation can be made faster (remove the for loop)
-X = np.empty((len(kps_1), 3, 1))
-for i in range(len(kps_1)):
-    XH = cv2.triangulatePoints(m1, m2, kps_1[i], kps_2[i]) #triagulated points are stored in homogeneous coordinates
-    X[i] = XH[:3] / XH[3] #convert to euclidean coordinates
-    
+
 # plot the initialization images
 plt.figure(figsize=(10, 10))
 plt.imshow(img0, cmap='gray')
@@ -86,7 +81,8 @@ plt.ylabel('y (pixels)')
 plt.title('Image 2')
 plt.show()
 
-# 3D plot of the 3D landmarks (X)
+# 3D plot of the initialization 3D landmarks (X)
+X = np.array(list(state.values()))
 fig = plt.figure(figsize=(10, 10))
 ax = fig.add_subplot(111, projection='3d')
 ax.scatter(X[:, 0], X[:, 1], X[:, 2], c='r', s=20)
@@ -95,4 +91,8 @@ ax.set_ylabel('y (m)')
 ax.set_zlabel('z (m)')
 ax.set_title('3D landmarks (X)')
 plt.show()
+
+
+### - Continuous Operation
+
 
