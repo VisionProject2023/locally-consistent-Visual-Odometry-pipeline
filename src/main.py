@@ -1,3 +1,5 @@
+# %%
+
 import os
 import numpy as np
 import cv2
@@ -7,7 +9,7 @@ from vo_pipeline import *
 # Setup
 if config['dataset'] == 'kitti':
     # Set kitti_path to the folder containing "05" and "poses"
-    kitti_path = 'kitti'  # replace with your path
+    kitti_path = '../kitti'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
     last_frame = 4540
@@ -15,7 +17,7 @@ if config['dataset'] == 'kitti':
                   [0, 718.856, 185.2157],
                   [0, 0, 1]])
     
-    bootstrap_frames = [0, 2]
+    bootstrap_frames = [0, 4]
     img0 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[0]:06d}.png', cv2.IMREAD_GRAYSCALE)
     img1 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[1]:06d}.png', cv2.IMREAD_GRAYSCALE)
 
@@ -57,13 +59,17 @@ VOInit = VOInitializer(K)
 ### 1 - Initialization
 # detect, describe and match features
 kps_1, kps_2 = VOInit.getKeypointMatches(img0, img1)
+print("len kps1", kps_1.shape)
 
 # estimate pose
 img1_img2_pose_tranform = VOInit.getPoseEstimate(kps_1, kps_2)
 
 # triangulate landmarks
 state = VOInit.get_2D_3D_landmarks_association(kps_1, kps_2, img1_img2_pose_tranform)
-X = np.array(list(state.values()))
+print(state.keys())
+print("len P ",state['P'].shape)
+X = state['X']
+P = state['P']
 
 # plot the initialization images
 plt.figure(figsize=(10, 10))
@@ -93,48 +99,49 @@ ax.set_title('3D landmarks (X)')
 plt.show()
 
 # plot a filtered version of the 3D landmarks (X) (some bugs, comes form Ricardo)
-# T_hom = np.vstack((np.hstack((img1_img2_pose_tranform, np.zeros((1,3)))), np.array([0,0,0,1])))
-# t_inv = np.linalg.inv(T_hom)
-# axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+print("dimensione ", img1_img2_pose_tranform.shape)
+T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
+t_inv = np.linalg.inv(T_hom)
+axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
-# filter = np.linalg.norm(X, axis = 0) < 4
-# print("filter len ", filter.shape)
-# X_filtered = X[:, filter]
-# plt.scatter(X_filtered[0,:], X_filtered[2,:], color='blue', marker='o', label='Points')
-# plt.scatter(P[0,:], P[2,:], color='red', marker='o', label='Points')
-# plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
-# plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
-# plt.xlabel('X-axis')
-# plt.ylabel('Z-axis')
-# plt.ylim((0,10))
-# plt.xlim((-5,5))
-# plt.title('2D Points Visualization')
-# plt.legend() # Show legend
-# plt.show() # Show the plot
+filter = np.linalg.norm(X, axis = 1) < 10
+print("filter len ", filter.shape)
+print("X shape ", X.shape)
+X_filtered = X[filter,:]
+plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
+plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
+plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
+plt.xlabel('X-axis')
+plt.ylabel('Z-axis')
+plt.ylim((0,10))
+plt.xlim((-5,5))
+plt.title('2D Points Visualization')
+plt.legend() # Show legend
+plt.show() # Show the plot
 
-# # plot all and filtered 2D keypoints (img 1)
-# plt.imshow(img1)
-# points = kps_1[filter, :]
-# print("size filtered points ", points.shape)
-# plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
-# plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
-# plt.plot()
-# plt.show()
+# plot all and filtered 2D keypoints (img 1)
+plt.imshow(img1)
+points = kps_1[filter, :]
+print("size filtered points ", points.shape)
+plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
+plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
+plt.plot()
+plt.show()
 
-# # plot all and filtered 2D keypoints (img 2)
-# plt.imshow(img1)
-# points2 = kps_2[filter,:]
-# plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
-# plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
-# plt.plot()
-# plt.show()
+# plot all and filtered 2D keypoints (img 2)
+plt.imshow(img1)
+points2 = kps_2[filter,:]
+plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
+plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
+plt.plot()
+plt.show()
 
 
 ### - Continuous Operation
 
 #instantiate BestVision:
 vision = BestVision(K)
-vision.update_state(kps_2, X.T)
+vision.state = state
 
 
 # loading the next image
@@ -156,3 +163,5 @@ state_2 = associate.associateKeypoints(img1,img2, vision.state)
 
 
 
+
+# %%

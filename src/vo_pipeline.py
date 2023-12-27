@@ -214,9 +214,9 @@ class VOInitializer():
         # set the initial state of the VO pipeline 
         state: Dict[tuple[np.ndarray, np.ndarray], np.ndarray] = {}
         XH = cv2.triangulatePoints(m1, m2, kps_1.T, kps_2.T).T #triagulated points are stored in homogeneous coordinates
-        state = {tuple(map(tuple, key)): value[:3]/value[3] for key, value in zip(zip(kps_1, kps_2), XH)} #add 3D points to the state, convert to euclidean coordinates, converts kps into tuples
-
-        # this triangulated points can be made more accurate by minimizing the square reprojection error!
+        # state = {tuple(map(tuple, key)): value[:3]/value[3] for key, value in zip(zip(kps_1, kps_2), XH)} #add 3D points to the state, convert to euclidean coordinates, converts kps into tuples
+        state['X'] = (XH[:,0:3].T / XH[:,3].T).T
+        state['P'] = kps_1
         # -> feature to work on!
         
         return state
@@ -276,7 +276,7 @@ class KeypointsToLandmarksAssociator():
                      [np.sin(theta_max),   np.cos(theta_max), 0],
                      [0 ,                0,                   1]])
         #the paper (Scaramuzza) says that I can set rho to  1, see if it make sense with the reprojected points
-        T =np.array([np.cos(theta_max/2), np.sin(theta_max/2), 0])
+        T = 0.5 * np.array([np.cos(theta_max/2), np.sin(theta_max/2), 0])
         #reprojection error:
         T_i = np.reshape(T,(T.shape[0],1))
         Hom = np.hstack((R,T_i))
