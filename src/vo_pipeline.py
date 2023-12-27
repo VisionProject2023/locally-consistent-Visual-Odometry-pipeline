@@ -25,7 +25,7 @@ class BestVision():
     complete map of the track as well as the complete trajectory. We can also add stuff for the 0.5 feature
     '''
 
-    def __init__(self, K: np.ndarray):
+    def __init__(self, K: np.ndarray, last_frame: int):
         '''
         This method builds the object and creates the attributes we are going to use. In particular we store the last image received and a state dictionary which contains
         information about the 3D landmarks that we identified in the previous step (the state refers only to the previous step since the 
@@ -37,13 +37,15 @@ class BestVision():
         '''
 
         self.K = K # Intrinsic parameters, the camera is assumed to be calibrated
+        self.last_frame = last_frame
+        
         self.previous_image = np.ndarray
-        self.state = {'P' : np.ndarray, 'X' : np.ndarray}
-        self.candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
+        self.state: Dict[(float, float), np.ndarray] = {} # 'P' (keypoints), 'X' (3D landmarks)
+        #self.state_with_candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
-    def initialize(frame_sequence: np.ndarray) -> np.ndarray:
+    def initialize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
         '''
-        Takes as input a sequence of frames, initializes the state and candidate_keypoints and returns the configuration of the second keyframe 
+        Initializes the state and returns the configuration of the second keyframe 
         with respect to the first frame which configuration is considered as the world frame. This function makes the choice of which frame to use 
         as second frame in initialization (for example the third frame in the sequence for th KITTY dataset as suggested)
 
@@ -51,9 +53,11 @@ class BestVision():
             frame_sequence: List[ HxW np.ndarray ] a list of all the frames (or just the first n)
 
         Outputs:
-            T: 4x4 np.ndarray representing the transformation between the first frame and the second keyframe (for example the third in the image flow) 
+            T: 4x4 np.ndarray representing pose (T = [R|t]])
+            S: dictionary with keypoints 'P' (keys) and 3D landmarks 'X' (values) 
         '''
-
+        
+    
         pass
 
     def update_state(self, P: np.ndarray, X: np.ndarray):
@@ -71,21 +75,27 @@ class BestVision():
             T: 4x4 np.ndarray which encodes the new pose with respect to the world frame
         '''
         pass
-
+    
 
 class VOInitializer():
     
     '''
-    Compute the pose of frame2 with respect to frame1 and outputs 3D landmarks
+    Provides the functionality to initialize to Visual Odometry Pipeline
+    1) estimating the pose of frame2 -> T
+        - (func) getKeypointMatches -> keypoints
+        - (func) getPoseEstimate -> T
+        
+    2) estimating the 3D landmarks -> S (state)
+        - (func) get_3D_landmarks -> S
     
-    The aim of the VOInitialization should be to estimate the pose of frame2 and 3D landmarks as accurate as possible
+    (we aim to make this estimation as accurate as possible)
 
     Inputs: 
         frame1: HxW np.ndarray
         frame2: HxW np.ndarray
 
     Outputs:
-        T: 4x4 np.ndarray representing pose
+        T: 4x4 np.ndarray representing pose (T = [R|t]])
         S: dictionary with keypoints 'P' (keys) and 3D landmarks 'X' (values)
     '''
     
@@ -95,8 +105,18 @@ class VOInitializer():
         '''
         self.K = K
 
-    def get_keypoint_matches(self, frame1: np.ndarray, frame2: np.ndarray) -> np.ndarray:
-        ''' Match keypoints between two frames using Shi_Tomashi feature detector and SIFT descriptor'''
+    def getKeypointMatches(self, frame1: np.ndarray, frame2: np.ndarray) -> (np.array, np.array):
+        ''' 
+        Match keypoints between two frames using different detectors (default = SIFT) and the SIFT descriptor
+        
+        Args:
+            frame1: HxW np.ndarray
+            frame2: HxW np.ndarray
+        
+        Returns:
+            good_kps_f1: array of keypoints in frame1
+            good_kps_f2: array of keypoints in frame2
+        '''
 
         if config['init_detector_descriptor'] =='shi-tomasi-sift':
             
@@ -118,7 +138,7 @@ class VOInitializer():
             # this has to be figured out!
             
         if config['init_detector_descriptor'] == 'sift':
-            # All SIFT implementation:
+            # All SIFT implementat  ion:
             sift = cv2.SIFT.create()
             kps_f1, des1 = sift.detectAndCompute(frame1, None)
             kps_f2, des2 = sift.detectAndCompute(frame2, None)
@@ -134,8 +154,6 @@ class VOInitializer():
         kp_matches = bf.knnMatch(des1, des2, k=2) # k=2: return the two best matches for each descriptor
 
         # Apply ratio test (preventing false matches)
-        good_kps_f1 = []
-        good_kps_f2 = []
         good_kp_matches = []
         for m,n in kp_matches:
             if m.distance < 0.8*n.distance: # "distance" = distance function = how similar are the descriptors
@@ -169,19 +187,24 @@ class VOInitializer():
         # # Filter out good points
         # good_keypoints_new_frame = kps_f1_KLT[st]
         # good_keypoints_old_frame = kps_f2_KLT[st]
-        
 
-    def estimate_pose(self, kps_f1, kps_f2) -> np.ndarray:
+    def getPoseEstimate(self, kps_f1: list, kps_f2: list) -> np.ndarray:
         '''
-        Estimatea the pose of the second frame based on the 2D-2D correspondences between the two frames
+        Estimatea the pose of the second frame based on the 2D-2D correspondences between the two frames (5-point RANSAC algorithm)
         The pose is always relative to the very first frame (which is the world frame)
+        
+        Args: 
+            kps_f1: list of keypoints in frame1
+            kps_f2: list of keypoints in frame2
+            
+        Returns: 
+            T: 3x4 np.ndarray (T = [R|t]) (transformation matrix) representing the pose of frame2 with respect to frame1 
         '''
         
-        # Idea: Use the 1-point RANSAC to remove the intial outliers (with a relatively big error treshold), now we have a low rate of outliers
-        # Then, use the 5-point RANSAC to remove the remaining outliers (5-point algorithm uses the epipolar geometry to compute the essential matrix
+        # Use the 5-point RANSAC to compute the essential matrix, taking outliers into account (5-point algorithm uses the epipolar geometry to compute the essential matrix)
         # But, the 5-point algorithms can return up to 10 solution of the essential matrix
 
-        # Compute the essential matrix using the RANSAC 8-point algorithms
+        # Compute the essential matrix using the RANSAC 5-point algorithms
         E, mask = cv2.findEssentialMat(kps_f1, kps_f2, self.K, cv2.RANSAC, 0.999, 1.0, None)
         # Given the essential matrix, 4 possible combinations of R and T are possile, but only one is in front of the camera (cheirality constraint)
         _, R, t, _ = cv2.recoverPose(E, kps_f1, kps_f2, self.K, mask=mask) #recoverPose enforces the 
@@ -283,7 +306,6 @@ class KeypointsToLandmarksAssociator():
 
         return new_state
 
-
 class PoseEstimator():
     def __init__(self, K):
         '''
@@ -316,8 +338,6 @@ class PoseEstimator():
         return T
 
 
-        
-
 class LandmarkTriangulator():
     def __init__(self, K):
         '''
@@ -340,7 +360,7 @@ class LandmarkTriangulator():
         # TELL NICOLA TO PASS ME cur_pose !!!
         # ATTENTION: construct candidate_keypoints['T'] as a three-dimensional vector (K,4,4) !!!
 
-        # new_candidates are the new keypoints identified by Ricky in the cur_frame and NOT present in the previous frames
+        # new_candidates_list are the new keypoints identified by Ricky in the cur_frame and NOT present in the previous frames
         # => EXPLAIN TO RICKY HOW TO PASS THEM: I would say he can simply pass a list of these new_candidates
         # that he finds by taking the keypoints of cur_frame that have no correspondence in the prec_frame
         # ATTENTION: every time all the keyframes that have not yet been
@@ -348,7 +368,8 @@ class LandmarkTriangulator():
         # validated
 
         # I proceed to evaluate which of these new_candidates had already been previously tracked and which are
-        # new. I also proceed to remove the candidate_points that have not been re-identified.ovi. Procedo inoltre ad eliminare i candidate_points che non sono stati re-individuati.
+        # new. I also proceed to remove the candidate_points that have not been re-identified
+
 
 
         # TRACK CANDIDATE KEYPOINTS
@@ -357,17 +378,19 @@ class LandmarkTriangulator():
         if p1 is not None:
             good_new = p1[st==1]
             good_old = p0[st==1]
-        
+        if len(good_old) != len(good_new):
+            print(f"ERRORE: good_old e good_new NON hanno la stessa lunghezza. len(good_old)={len(good_old)}!={len(good_new)}=len(good_new)")
+
 
         # REMOVE CANDIDATE KEYPOINTS THAT HAVE NOT BEEN RETRACKED
         bad_old = p0[st==0]
-        # Create a boolean mask to identify the positions of elements to be removed
+        # Create a boolean mask to identify the positions of candidate keypoints that have not been retracked
         mask = np.isin(candidate_keypoints['C'], bad_old)
         # Get the indices of elements to be removed
         indices_to_remove = np.where(mask)[0]
         # Check if any elements are found before attempting removal
         if indices_to_remove.size > 0:
-            # Remove the elements using boolean indexing
+            # Proceed to remove them
             candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_remove)
             candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_remove)
             candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_remove)
@@ -385,14 +408,59 @@ class LandmarkTriangulator():
         
 
         # UPDATE C OF CANDIDATE POINTS THAT HAVE BEEN RETRACKED
-        # Create a boolean mask to identify the positions of elements to be removed
+        # Create a boolean mask to identify the positions of the tracked candidate keypoints to be updated
         mask = np.isin(candidate_keypoints['C'], good_old)
-        # Get the indices of elements to be removed
+        # Update all the candidate keypoints that have been retracked
         candidate_keypoints['C'][mask] = good_new
-        
+    
 
         # VALIDATE NEW POINTS
-  
-        pass
+        treshold = 5
+        indices_to_validate = []
+        # Consider all candidate keypoints
+        for idx in len(candidate_keypoints['C']):
+            # Compute the bearing vector corresponding to the current observation
+            uc, vc = candidate_keypoints['C'][idx]
+            wc = np.sqrt(uc**2 + vc**2 + 1)
+            vector_a = np.array([uc/wc, vc/wc, 1/wc])
+
+            # Compute the bearing vector corresponding to the first observation
+            uf, vf = candidate_keypoints['F'][idx]
+            wf = np.sqrt(uf**2 + vf**2 + 1)
+            vector_b = np.array([uf/wf, vf/wf, 1/wf])
+
+            # Compute the angle between the two bearing vectors
+            cos = np.dot(vector_a, vector_b) / (np.linalg.norm(vector_a) * np.linalg.norm(vector_b))
+            # Ensure the value is within the valid range for arccosine
+            cos = np.clip(cos, -1.0, 1.0)
+            # Calculate the angle
+            alpha = np.degrees(np.arccos(cos))
+
+            # Confront the angle with a treshold: if bigger, proceed to validate
+            if alpha > treshold:
+                indices_to_validate.append(idx)
+
+        for idx in indices_to_validate:
+            # Add homogeneous coordinates (1) to the 2D points
+            point1 = np.hstack((candidate_keypoints['C'][idx], np.array((1))))
+            point2 = np.hstack((candidate_keypoints['F'][idx], np.array((1))))
+            
+            # Triangulate the validated keypoint
+            point_3d_hom = cv2.triangulatePoints(cur_pose, candidate_keypoints['T'][idx], point1.T, point2.T)
+            # Convert homogeneous coordinates to 3D coordinates
+            point_3d = cv2.convertPointsFromHomogeneous(point_3d_hom.T).reshape(-1, 3)
+
+            # Add the validated keypoint to the state
+            state['P'].append(candidate_keypoints['C'][idx])
+            state['X'].append(point_3d)
+            
+
+        # Remove the validated keypoints from the candidate list
+        candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_validate)
+        candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_validate)
+        candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_validate)
+
 
         
+
+        pass
