@@ -26,7 +26,7 @@ def cross2Matrix(x):
 # Setup
 if config['dataset'] == 'kitti':
     # Set kitti_path to the folder containing "05" and "poses"
-    kitti_path = '../kitti'  # replace with your path
+    kitti_path = 'kitti'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
     last_frame = 4540
@@ -77,14 +77,14 @@ VOInit = VOInitializer(K)
 # instantiate Landmark association
 associate = KeypointsToLandmarksAssociator(K)
 
-initial_good_kp_matches, kps1, kps2 = VOInit.get_keypoint_matches(img0, img1)
+initial_good_kp_matches, kps1, kps2 = VOInit.getKeypointMatches(img0, img1)
 # print(len(initial_good_kp_matches))
 # print(len(kps1))
 # print(len(kps2))
 # img3 = cv2.drawMatches(img0,kps1,img1,kps2,initial_good_kp_matches,None,flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 # plt.imshow(img3)
 
-T_hom = VOInit.estimate_pose(kps1, kps2)
+T_hom = VOInit.getPoseEstimate(kps1, kps2)
 t_inv = np.linalg.inv(T_hom)
 axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 print(t_inv[0:3,:])
@@ -132,13 +132,13 @@ plt.show()
 
 vision.update_state(kps2, Landmarks3D.T)
 
-if ds == 0:
+if config['dataset'] == 'kitti':
     img2 = cv2.imread(f'{kitti_path}/05/image_0/{5:06d}.png', cv2.IMREAD_GRAYSCALE)
 
-elif ds == 1:
+elif config['dataset'] == 'malaga':
     img2 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[2]]}', cv2.IMREAD_GRAYSCALE)
 
-elif ds == 2:
+elif config['dataset'] == 'parking':
     img2 = cv2.imread(f'{parking_path}/images/img_{bootstrap_frames[2]:05d}.png', cv2.IMREAD_GRAYSCALE)
 
 else:
