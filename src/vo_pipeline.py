@@ -155,6 +155,8 @@ class VOInitializer():
 
         # Apply ratio test (preventing false matches)
         good_kp_matches = []
+        good_kps_f1 = []
+        good_kps_f2 = []
         for m,n in kp_matches:
             if m.distance < 0.8*n.distance: # "distance" = distance function = how similar are the descriptors
                 good_kp_matches.append(m)
