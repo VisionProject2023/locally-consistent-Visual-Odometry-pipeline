@@ -297,7 +297,7 @@ class KeypointsToLandmarksAssociator():
         
         print("drawing ......")
         plt.imshow(old_frame)
-        filter3 = np.linalg.norm(next_points-proj_points, axis = 1) < 30
+        filter3 = np.linalg.norm(next_points-proj_points, axis = 1) < 10
         plt.scatter(proj_points[filter3,0], proj_points[filter3,1], color='blue', marker='o', label='Points')
         plt.scatter(next_points[filter3,0], next_points[filter3,1], color='red', marker='o', label='Points')
         plt.scatter(next_points[filter3,0], next_points[filter3,1], color='green', marker='o', label='Points')
