@@ -1,6 +1,6 @@
 import types
 import numpy as np
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from typing import Dict
 import cv2
 import yaml
@@ -57,6 +57,10 @@ class BestVision():
         
     
         pass
+    
+    def update_state(self, P: np.ndarray, X: np.ndarray):
+        self.state['P'] = P
+        self.state['X'] = X
 
     def processFrame(new_frame: np.ndarray) -> np.ndarray:
         '''
@@ -226,7 +230,7 @@ class KeypointsToLandmarksAssociator():
         self.K = K
         pass
 
-    def associateKeypoints(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict, features: list) -> dict:
+    def associateKeypoints(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict) -> dict:
         '''
         Associate keypoints from old image to features of the new image.
 
@@ -250,34 +254,57 @@ class KeypointsToLandmarksAssociator():
         #                  positions of input features in the second image
         #       status -> vector with 1 if corresponding feature has been found, 0 if not
         #       error -> output vector of errors
-
-        next_points, status, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, state['P'])
-
+        state['P'] = state['P'].astype(np.float32)
+        next_points, status, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, state['P'], None)
+        filter_status = np.hstack(status).astype(np.bool_)
+        state_p_found = state['P'][filter_status]
+        next_points = next_points[filter_status]
+   
         #remove outliers
         #we are seeing a car like vehichle, so we can exploit the 1 point ransac:
         # I imagine a 2 x N array
         #thetas should be a 1 x N array
         #paper scaramuzza: https://rpg.ifi.uzh.ch/docs/IJCV11_scaramuzza.pdf
-        thetas = -2 * np.arctan((next_points[0,:]-state['P'][0,:])/(next_points[1,:]-state['P'][1,:]))
+        thetas = -2 * np.arctan((next_points[:,0]-state_p_found[:,0])/(next_points[:,1]+state_p_found[:,1]))
         #we generate all the possible thetas, and then generate an histogram
-        hist = np.histogram(thetas)
-        theta_max = np.median(hist)
-        R = np.array([np.cos(theta_max), - np.sin(theta_max), 0],
+        hist, batch = np.histogram(thetas)
+        print("hist ", hist)
+        theta_max = np.median(thetas)
+        print("THETA_MAX ", theta_max * 180 / np.pi)
+        #I can decide to minimize the reprojection error o remove the ones that are outside a ccertain range
+        R = np.array([[np.cos(theta_max), - np.sin(theta_max), 0],
                      [np.sin(theta_max),   np.cos(theta_max), 0],
-                     [0 ,                0,                   1])
+                     [0 ,                0,                   1]])
         #the paper (Scaramuzza) says that I can set rho to  1, see if it make sense with the reprojected points
-        T =np.array([np.cos(theta_max/2), np.sin(theta_max/2), 0]).T
+        T =np.array([np.cos(theta_max/2), np.sin(theta_max/2), 0])
         #reprojection error:
-        projected_points = (np.vstack[(R,T)] @ np.vstack((state['P'], np.ones_like(state['P'].shape[0]))))[:,0:2]
-        error_threshold = 1 #error threshold of one pixel
-        filter = next_points[np.linalg.norm(next_points - projected_points )< error_threshold]
+        T_i = np.reshape(T,(T.shape[0],1))
+        Hom = np.hstack((R,T_i))
+        add_vector = np.zeros((4,1))
+        add_vector[3] = 1
+        Hom = np.vstack((Hom, add_vector.T))
+        hom_inv = np.linalg.inv(Hom)
+        state_found_x = state['X'][filter_status]
+        proj_points, jacob = cv2.projectPoints(state_found_x, hom_inv[0:3,0:3], hom_inv[0:3,3], self.K, None)
+        proj_points = np.reshape(proj_points, (proj_points.shape[0], proj_points.shape[-1]))
+        
+        print("drawing ......")
+        plt.imshow(old_frame)
+        filter3 = np.linalg.norm(next_points-proj_points, axis = 1) < 30
+        plt.scatter(proj_points[filter3,0], proj_points[filter3,1], color='blue', marker='o', label='Points')
+        plt.scatter(next_points[filter3,0], next_points[filter3,1], color='red', marker='o', label='Points')
+        plt.scatter(next_points[filter3,0], next_points[filter3,1], color='green', marker='o', label='Points')
+        # plt.xlim((0,1200))
+        plt.plot()
+        plt.show()
 
         #return new status and connection
-        new_P = state['X'][status]
-        new_P_error_free = new_P[filter]
-        new_state = {'P': new_P_error_free, 'X':next_points[filter]}
+        new_P_error_free = state_p_found[filter3]
+        print("len P no error ", new_P_error_free.shape)
+        new_state = {'P': new_P_error_free, 'X': next_points[filter3]}
 
         return new_state
+    
 
 class PoseEstimator():
     def __init__(self, K):
