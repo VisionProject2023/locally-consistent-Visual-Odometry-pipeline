@@ -23,7 +23,7 @@ class BestVision():
     complete map of the track as well as the complete trajectory. We can also add stuff for the 0.5 feature
     '''
 
-    def __init__(self, K: np.ndarray, last_frame: int):
+    def __init__(self, K: np.ndarray):
         '''
         This method builds the object and creates the attributes we are going to use. In particular we store the last image received and a state dictionary which contains
         information about the 3D landmarks that we identified in the previous step (the state refers only to the previous step since the 
@@ -35,11 +35,11 @@ class BestVision():
         '''
 
         self.K = K # Intrinsic parameters, the camera is assumed to be calibrated
-        self.last_frame = last_frame
+        #self.last_frame = last_frame
         
         self.previous_image = np.ndarray
-        self.state: Dict[(float, float), np.ndarray] = {} # 'P' (keypoints), 'X' (3D landmarks)
-        #self.state_with_candidate_keypoints = {'P' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
+        self.state = {'P': np.ndarray, 'X': np.ndarray} # 'P' (keypoints), 'X' (3D landmarks)
+        self.state_with_candidate_keypoints = {'P' : np.ndarray, 'X' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
     def initialize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
         '''

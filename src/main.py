@@ -51,12 +51,8 @@ else:
 
 
 
-#instantiate BestVision:
-# vision = BestVision(K)
-
 # instantiate the VOInitializer
 VOInit = VOInitializer(K)
-
 
 ### 1 - Initialization
 # detect, describe and match features
@@ -136,11 +132,12 @@ plt.show()
 
 ### - Continuous Operation
 
-# instantiate Landmark association
-associate = KeypointsToLandmarksAssociator(K)
-
+#instantiate BestVision:
+vision = BestVision(K)
 vision.update_state(kps_2, X.T)
 
+
+# loading the next image
 if config['dataset'] == 'kitti':
     img2 = cv2.imread(f'{kitti_path}/05/image_0/{5:06d}.png', cv2.IMREAD_GRAYSCALE)
 
@@ -153,6 +150,8 @@ elif config['dataset'] == 'parking':
 else:
     raise ValueError("Invalid dataset selection")
 
+# instantiate Landmark association
+associate = KeypointsToLandmarksAssociator(K)
 state_2 = associate.associateKeypoints(img1,img2, vision.state)
 
 
