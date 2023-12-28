@@ -308,7 +308,8 @@ class KeypointsToLandmarksAssociator():
         #return new status and connection
         new_P_error_free = state_p_found[filter3]
         print("len P no error ", new_P_error_free.shape)
-        new_state = {'P': new_P_error_free, 'X': next_points[filter3]}
+        #new_state = {'P': new_P_error_free, 'X': next_points[filter3]}
+        new_state = {'P': next_points[filter3], 'X': state_found_x[filter3]}
 
         #TODO update our current pose based on the Nicola function
 
@@ -323,27 +324,36 @@ class PoseEstimator():
         self.K = K
 
         """ Constants """
-        self.REPROJ_THRESH = 3
+        self.REPOJ_THRESH = 1      # threshold on the reprojection error of points accepted as inliers
+        self.CONFIDENCE = 0.9999   # dsired confidence of result
     
     def estimatePose(self, associations: Dict[np.ndarray,np.ndarray]) -> np.ndarray:
         '''
         Computes the current pose from the associations found in previous steps
 
         Inputs:
-            associations: dictionary with keys 'P' and 'X_old' that contains 2D points from the new frame and the corresponding matching in the state vector
+            associations: dictionary with keys 'P' and 'X_old' that contain 2D points from the new frame and the corresponding matching in the state vector
 
         Outputs:
             T: 4x4 np.ndarray representing the pose of the new frame with respect to the world frame
         '''
-        success, R, t, inliers = cv2.solvePnpRansac(objectPoints = associations['X_old'], 
-                                  imagePoints = associations['P'],
-                                  cameraMatrix = self.K,
-                                  distCoeffs = None,
-                                  flags=cv2.SOLVEPNP_P3P,
-                                  confidence=0.9999 ,
-                                  reprojectionError=self.REPROJ_THRESH)
+
+        P = associations['P']
+        X = associations['X']
+
+        success, R_vec, t, inliers = cv2.solvePnPRansac(X,            # 3D points
+                                                        P,            # 2D points               
+                                                        self.K,       # intrinsic parameters
+                                                        np.zeros(4),  # unknown parameter
+                                                        flags=cv2.SOLVEPNP_ITERATIVE,
+                                                        confidence=self.CONFIDENCE ,
+                                                        reprojectionError=self.REPOJ_THRESH)
         
-        T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([0,0,0,1])], axis=0)
+        R, _ = cv2.Rodrigues(R_vec)
+
+        # add nonlinear refinement with --> solvePnPRefineLM
+        
+        T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([[0,0,0,1]])], axis=0)
         return T
 
 

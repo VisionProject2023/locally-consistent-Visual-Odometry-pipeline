@@ -98,7 +98,7 @@ ax.set_zlabel('z (m)')
 ax.set_title('3D landmarks (X)')
 plt.show()
 
-# plot a filtered version of the 3D landmarks (X) (some bugs, comes form Ricardo)
+# plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
 print("dimensione ", img1_img2_pose_tranform.shape)
 T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
 t_inv = np.linalg.inv(T_hom)
@@ -136,7 +136,6 @@ plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered
 plt.plot()
 plt.show()
 
-
 ### - Continuous Operation
 
 #instantiate BestVision:
@@ -161,7 +160,35 @@ else:
 associate = KeypointsToLandmarksAssociator(K)
 state_2 = associate.associateKeypoints(img1,img2, vision.state)
 
+pose_estimator = PoseEstimator(K)
+T_world_newframe = pose_estimator.estimatePose(state_2)
 
+# ***** DEBUG *****
+# plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
+print("dimensione ", img1_img2_pose_tranform.shape)
+T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
+t_inv = np.linalg.inv(T_hom)
+axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
+t_inv_2 = np.linalg.inv(T_world_newframe)
+axis_2 = t_inv_2 @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+
+filter = np.linalg.norm(X, axis = 1) < 10
+print("filter len ", filter.shape)
+print("X shape ", X.shape)
+X_filtered = X[filter,:]
+plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
+plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
+plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
+plt.plot([axis_2[0,3],axis_2[0,0]],[axis_2[2,3], axis_2[2,0]], 'b-')
+plt.plot([axis_2[0,3],axis_2[0,2]],[axis_2[2,3], axis_2[2,2]], 'b-')
+plt.xlabel('X-axis')
+plt.ylabel('Z-axis')
+plt.ylim((0,10))
+plt.xlim((-5,5))
+plt.title('2D Points Visualization')
+plt.legend() # Show legend
+plt.show() # Show the plot
+# *****************
 
 # %%
