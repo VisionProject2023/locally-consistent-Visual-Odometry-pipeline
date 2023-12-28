@@ -323,14 +323,14 @@ class PoseEstimator():
         self.K = K
 
         """ Constants """
-        self.REPOJ_THRESH = 3
+        self.REPROJ_THRESH = 3
     
     def estimatePose(self, associations: Dict[np.ndarray,np.ndarray]) -> np.ndarray:
         '''
         Computes the current pose from the associations found in previous steps
 
         Inputs:
-            associations: dictionary with keys 'P' and 'X_old' that contain 2D points from the new frame and the corresponding matching in the state vector
+            associations: dictionary with keys 'P' and 'X_old' that contains 2D points from the new frame and the corresponding matching in the state vector
 
         Outputs:
             T: 4x4 np.ndarray representing the pose of the new frame with respect to the world frame
@@ -341,7 +341,7 @@ class PoseEstimator():
                                   distCoeffs = None,
                                   flags=cv2.SOLVEPNP_P3P,
                                   confidence=0.9999 ,
-                                  reprojectionError=self.REPOJ_THRESH)
+                                  reprojectionError=self.REPROJ_THRESH)
         
         T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([0,0,0,1])], axis=0)
         return T
