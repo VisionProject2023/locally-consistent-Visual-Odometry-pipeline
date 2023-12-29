@@ -155,7 +155,6 @@ class LandmarkTriangulator():
         # new. I also proceed to remove the candidate_points that have not been re-identified
 
 
-
         # TRACK CANDIDATE KEYPOINTS
         p0 = candidate_keypoints['C']
         p1, st, err = cv2.calcOpticalFlowPyrLK(old_frame, cur_frame, p0, None)
@@ -217,7 +216,7 @@ class LandmarkTriangulator():
             cos = np.dot(vector_a, vector_b) / (np.linalg.norm(vector_a) * np.linalg.norm(vector_b))
             # Ensure the value is within the valid range for arccosine
             cos = np.clip(cos, -1.0, 1.0)
-            # Calculate the angle
+            # Compute the angle
             alpha = np.degrees(np.arccos(cos))
 
             # Confront the angle with a treshold: if bigger, proceed to validate
