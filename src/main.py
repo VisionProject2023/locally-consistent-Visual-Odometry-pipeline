@@ -183,6 +183,7 @@ for img_idx in range(5,11):
 
     vision.state = new_state
     vision.candidate_keypoints = candidate_keypoints
+    img1 = img2
     # if debug:
     #     print(f"vision.state: {vision.state}")
     #     print(f"vision.candidate_keypoints: {vision.candidate_keypoints}")
