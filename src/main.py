@@ -155,7 +155,7 @@ vision = BestVision(K)
 vision.state = state
 vision.candidate_keypoints = candidate_keypoints
 
-for img_idx in range(5,11):
+for img_idx in range(5,110):
     print(f"\n\n\n\n---------- IMG {img_idx} ----------")
     # loading the next image
     if config['dataset'] == 'kitti':
@@ -224,6 +224,6 @@ plt.xlim((-5,5))
 plt.title('2D Points Visualization')
 plt.legend() # Show legend
 plt.show() # Show the plot
-*****************
+#*****************
 
-%%
+#%%
