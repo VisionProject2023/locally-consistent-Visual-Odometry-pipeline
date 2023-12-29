@@ -9,7 +9,7 @@ from vo_pipeline import *
 # Setup
 if config['dataset'] == 'kitti':
     # Set kitti_path to the folder containing "05" and "poses"
-    kitti_path = '../kitti'  # replace with your path
+    kitti_path = 'C:/Users/augus/OneDrive/Documenti/Augusto/Master ETH/ETH - First Semester/Vision Algorithms for Mobile Robotics/Project/BestVision/kitti'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
     last_frame = 4540
@@ -75,7 +75,7 @@ P = state['P']
 plt.figure(figsize=(10, 10))
 plt.imshow(img0, cmap='gray')
 plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20)
-plt.xlabel('x (pixesl)')
+plt.xlabel('x (pixels)')
 plt.ylabel('y (pixels)')
 plt.title('Image 1')
 plt.show()
@@ -83,7 +83,7 @@ plt.show()
 plt.figure(figsize=(10, 10))
 plt.imshow(img0, cmap='gray')
 plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20)
-plt.xlabel('x (pixesl)')
+plt.xlabel('x (pixels)')
 plt.ylabel('y (pixels)')
 plt.title('Image 2')
 plt.show()
@@ -136,32 +136,67 @@ plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered
 plt.plot()
 plt.show()
 
+debug = True
 ### - Continuous Operation
+candidate_keypoints = {}
+candidate_keypoints['C'] = np.array([])
+candidate_keypoints['F'] = np.array([])
+candidate_keypoints['T'] = np.array([])
+
+sift = cv2.SIFT.create()
+_, old_des = sift.detectAndCompute(img1, None)
+
+cur_pose = img1_img2_pose_tranform
+print(f"img1_img2_pose_tranform: {img1_img2_pose_tranform}")
+print(f"img1_img2_pose_tranform.shape: {img1_img2_pose_tranform.shape}")
 
 #instantiate BestVision:
 vision = BestVision(K)
 vision.state = state
+vision.candidate_keypoints = candidate_keypoints
 
+for img_idx in range(5,11):
+    print(f"\n\n\n\n---------- IMG {img_idx} ----------")
+    # loading the next image
+    if config['dataset'] == 'kitti':
+        img2 = cv2.imread(f'{kitti_path}/05/image_0/{img_idx:06d}.png', cv2.IMREAD_GRAYSCALE)
 
-# loading the next image
-if config['dataset'] == 'kitti':
-    img2 = cv2.imread(f'{kitti_path}/05/image_0/{5:06d}.png', cv2.IMREAD_GRAYSCALE)
+    elif config['dataset'] == 'malaga':
+        img2 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[2]]}', cv2.IMREAD_GRAYSCALE)
 
-elif config['dataset'] == 'malaga':
-    img2 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[2]]}', cv2.IMREAD_GRAYSCALE)
+    elif config['dataset'] == 'parking':
+        img2 = cv2.imread(f'{parking_path}/images/img_{bootstrap_frames[2]:05d}.png', cv2.IMREAD_GRAYSCALE)
 
-elif config['dataset'] == 'parking':
-    img2 = cv2.imread(f'{parking_path}/images/img_{bootstrap_frames[2]:05d}.png', cv2.IMREAD_GRAYSCALE)
+    else:
+        raise ValueError("Invalid dataset selection")
 
-else:
-    raise ValueError("Invalid dataset selection")
+    # instantiate Landmark association
+    associate = KeypointsToLandmarksAssociator(K, cur_pose[0:3,:])
+    state_2, new_candidates_list = associate.associateKeypoints(img1,img2, vision.state)
+    if debug:
+        print(f"new_candidates_list: {new_candidates_list}")
+        print(f"len(state_2['P']): {len(state_2['P'])}")
 
-# instantiate Landmark association
-associate = KeypointsToLandmarksAssociator(K)
-state_2 = associate.associateKeypoints(img1,img2, vision.state)
+    pose_estimator = PoseEstimator(K)
+    T_world_newframe = pose_estimator.estimatePose(state_2)
+    if debug:
+        print(f"T_world_newframe: {T_world_newframe}")
 
-pose_estimator = PoseEstimator(K)
-T_world_newframe = pose_estimator.estimatePose(state_2)
+    landmark_triangulator = LandmarkTriangulator(K, old_des)
+    new_state, candidate_keypoints, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, state_2, candidate_keypoints, new_candidates_list, T_world_newframe)
+    # if debug:
+    #     print(f"new_state: {new_state}")
+    #     print(f"candidate_keypoints: {candidate_keypoints}")
+
+    vision.state = new_state
+    vision.candidate_keypoints = candidate_keypoints
+    img1 = img2
+    old_des = cur_des
+    cur_pose = T_world_newframe
+    # if debug:
+    #     print(f"vision.state: {vision.state}")
+    #     print(f"vision.candidate_keypoints: {vision.candidate_keypoints}")
+
 
 # ***** DEBUG *****
 # plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
@@ -189,6 +224,6 @@ plt.xlim((-5,5))
 plt.title('2D Points Visualization')
 plt.legend() # Show legend
 plt.show() # Show the plot
-# *****************
+*****************
 
-# %%
+%%

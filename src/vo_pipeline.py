@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from typing import Dict
 import cv2
 import yaml
+import pdb
 
 # type hinting guideline: images in openCV are numpy arrays
 
@@ -39,7 +40,7 @@ class BestVision():
         
         self.previous_image = np.ndarray
         self.state = {'P': np.ndarray, 'X': np.ndarray} # 'P' (keypoints), 'X' (3D landmarks)
-        self.state_with_candidate_keypoints = {'P' : np.ndarray, 'X' : np.ndarray, 'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
+        self.candidate_keypoints = {'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
     def initialize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
         '''
@@ -216,7 +217,7 @@ class VOInitializer():
         XH = cv2.triangulatePoints(m1, m2, kps_1.T, kps_2.T).T #triagulated points are stored in homogeneous coordinates
         # state = {tuple(map(tuple, key)): value[:3]/value[3] for key, value in zip(zip(kps_1, kps_2), XH)} #add 3D points to the state, convert to euclidean coordinates, converts kps into tuples
         state['X'] = (XH[:,0:3].T / XH[:,3].T).T
-        state['P'] = kps_1
+        state['P'] = kps_1      
         # -> feature to work on!
         
         return state
@@ -315,7 +316,10 @@ class KeypointsToLandmarksAssociator():
 
         #TODO update our current pose based on the Nicola function
 
-        return new_state
+        return (new_state, next_point_for_august)
+    
+    def update_pose(self, pose:np.ndarray):
+        self.current_pose = pose
     
     def update_pose(self, pose:np.ndarray):
         self.current_pose = pose
@@ -345,7 +349,6 @@ class PoseEstimator():
 
         P = associations['P']
         X = associations['X']
-
         success, R_vec, t, inliers = cv2.solvePnPRansac(X,            # 3D points
                                                         P,            # 2D points               
                                                         self.K,       # intrinsic parameters
@@ -363,14 +366,56 @@ class PoseEstimator():
 
 
 class LandmarkTriangulator():
-    def __init__(self, K):
+    def __init__(self, K, old_des):
         '''
         Initialize class
         '''
         self.K = K
+        self.old_des = old_des
+
         pass
 
-    def triangulateLandmark(self, candidate_keypoints: dict, old_frame: np.ndarray, cur_frame: np.ndarray, features: np.ndarray, state, new_candidates_list, cur_pose) -> dict:
+    def find_new_candidates(self, old_frame: np.ndarray, cur_frame: np.ndarray, state:dict, candidate_keypoints: dict) -> list:
+        
+        debug = False
+        sift = cv2.SIFT.create()
+        keypoints, cur_des = sift.detectAndCompute(cur_frame, None)
+
+        bf = cv2.BFMatcher.create(cv2.NORM_L2, crossCheck=False) # crossCheck=True is an alternative to the ratiotest (proposed by D. Lowe in SIFT paper)	
+        kp_matches = bf.knnMatch(self.old_des, cur_des, k=2) # k=2: return the two best matches for each descriptor
+
+        # Apply ratio test (preventing false matches)
+        good_kp_matches = []
+        for m,n in kp_matches:
+            if m.distance < 0.8*n.distance: # "distance" = distance function = how similar are the descriptors
+                good_kp_matches.append(m)
+
+        old_keypoints = np.array([keypoints[match.trainIdx].pt for match in good_kp_matches])
+        keypoints = np.array([kp.pt for kp in keypoints])
+        mask = np.isin(keypoints, old_keypoints, invert=True).all(axis=1)
+        
+        new_keypoints = keypoints[mask]
+        
+        # # divide the keypoints into new ones and already existing ones
+        # if len(candidate_keypoints['C']) > 0:
+        #     known_points = np.concatenate((state['P'], candidate_keypoints['C']), axis=0)
+        # else:
+        #     known_points = state['P']
+
+        if debug:
+            print("\n---- FIND NEW CANDIDATES ----")
+            print(f"keypoints: {keypoints}")
+            print(f"old_keypoints: {old_keypoints}")
+            print(f"len(state['P']): {len(state['P'])}")
+            print(f"len(keypoints): {len(keypoints)}")
+            print(f"mask: {mask}")
+            print(f"new_kp: {new_keypoints}")
+
+        return (new_keypoints, cur_des)
+
+
+
+    def triangulate_landmark(self, old_frame: np.ndarray, cur_frame: np.ndarray, state:dict, candidate_keypoints: dict, new_candidates_list, cur_pose) -> dict:
         '''
         Inputs:
             candidate_keypoints: dict as defined in the main class
@@ -394,55 +439,122 @@ class LandmarkTriangulator():
         # I proceed to evaluate which of these new_candidates had already been previously tracked and which are
         # new. I also proceed to remove the candidate_points that have not been re-identified
 
-
+        debug = False
+        debug2 = True
+        print("\n\n---------- TRIANGULATE LANDMARK ----------")
 
         # TRACK CANDIDATE KEYPOINTS
-        p0 = candidate_keypoints['C']
-        p1, st, err = cv2.calcOpticalFlowPyrLK(old_frame, cur_frame, p0, None)
-        if p1 is not None:
-            good_new = p1[st==1]
-            good_old = p0[st==1]
-        if len(good_old) != len(good_new):
-            print(f"ERRORE: good_old e good_new NON hanno la stessa lunghezza. len(good_old)={len(good_old)}!={len(good_new)}=len(good_new)")
+        p0 = candidate_keypoints['C'].astype(np.float32)
+        len_ckC_step1 = len(candidate_keypoints['C'])
+        len_stateP_start = len(state['P'])
+        if debug:
+            print(f"p0: {p0}")
+            print(f"len(p0): {len(p0)}")
+            print(f"len(candidate_keypoints['C']) iniziale: {len(candidate_keypoints['C'])}")
+            print(f"len(candidate_keypoints['F']) iniziale: {len(candidate_keypoints['F'])}")
+            print(f"len(candidate_keypoints['T']) iniziale: {len(candidate_keypoints['T'])}")
+
+        if len(p0)>0:
+            p1, st, err = cv2.calcOpticalFlowPyrLK(old_frame, cur_frame, p0, None)
+            st = np.hstack(st).astype(np.bool_)
+            if p1 is not None:
+                good_new = p1[st==1]
+                good_old = p0[st==1]
+            if len(good_old) != len(good_new):
+                print(f"ERRORE: good_old e good_new NON hanno la stessa lunghezza. len(good_old)={len(good_old)}!={len(good_new)}=len(good_new)")
+
+            if debug:
+                print("\n---- TRACK CANDIDATE KEYPOINTS ----")
+                print(f"p1: {p1}")
+                print(f"good_new: {good_new}")
+                print(f"good_old: {good_old}")
+
+            # REMOVE CANDIDATE KEYPOINTS THAT HAVE NOT BEEN RETRACKED
+            bad_old = p0[st==0]
+            # Create a boolean mask to identify the positions of candidate keypoints that have not been retracked
+            mask = np.isin(candidate_keypoints['C'], bad_old).all(axis=1)
+            # Get the indices of elements to be removed
+            indices_to_remove = np.where(mask)[0]
+            # Check if any elements are found before attempting removal
+            if len(indices_to_remove) > 0:
+                # Proceed to remove them
+                candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_remove, axis=0)
+                candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_remove, axis=0)
+                candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_remove, axis=0)
+
+            len_ckC_step2 = len(candidate_keypoints['C'])
+            if debug:
+                print("\n---- REMOVE CANDIDATE KEYPOINTS THAT HAVE NOT BEEN RETRACKED ----")
+                print(f"bad_old: {bad_old}")
+                print(f"mask: {mask}")
+                print(f"indices_to_remove: {indices_to_remove}")
+                print(f"candidate_keypoints['C']: {candidate_keypoints['C']}")
+                print(f"candidate_keypoints['F']: {candidate_keypoints['F']}")
+                print(f"candidate_keypoints['T']: {candidate_keypoints['T']}")
+                print(f"len(candidate_keypoints['C']) iniziale: {len_ckC_step1}")
+                print(f"len(candidate_keypoints['C']) dopo rimozione untracked: {len(candidate_keypoints['C'])}")
+                print(f"len(candidate_keypoints['F']) dopo rimozione untracked: {len(candidate_keypoints['F'])}")
+                print(f"len(candidate_keypoints['T']) dopo rimozione untracked: {len(candidate_keypoints['T'])}")
 
 
-        # REMOVE CANDIDATE KEYPOINTS THAT HAVE NOT BEEN RETRACKED
-        bad_old = p0[st==0]
-        # Create a boolean mask to identify the positions of candidate keypoints that have not been retracked
-        mask = np.isin(candidate_keypoints['C'], bad_old)
-        # Get the indices of elements to be removed
-        indices_to_remove = np.where(mask)[0]
-        # Check if any elements are found before attempting removal
-        if indices_to_remove.size > 0:
-            # Proceed to remove them
-            candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_remove)
-            candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_remove)
-            candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_remove)
+            # UPDATE C OF CANDIDATE POINTS THAT HAVE BEEN RETRACKED
+            # Create a boolean mask to identify the positions of the tracked candidate keypoints to be updated
+            mask = np.isin(candidate_keypoints['C'], good_old).all(axis=1)
+            # Update all the candidate keypoints that have been retracked
+            candidate_keypoints['C'][mask] = good_new
+
+            len_ckC_step3 = len(candidate_keypoints['C'])
+            if debug:
+                print("\n---- UPDATE C OF CANDIDATE POINTS THAT HAVE BEEN RETRACKED ----")
+                print(f"mask: {mask}")
+                print(f"candidate_keypoints['C'][mask]: {candidate_keypoints['C'][mask]}")
+                print(f"candidate_keypoints['C']: {candidate_keypoints['C']}")
+                print(f"len(candidate_keypoints['C']) dopo update retracked: {len(candidate_keypoints['C'])}")
+                print(f"len(candidate_keypoints['F']) dopo update retracked: {len(candidate_keypoints['F'])}")
+                print(f"len(candidate_keypoints['T']) dopo update retracked: {len(candidate_keypoints['T'])}")
 
 
         # ADD NEW CANDIDATE KEYPOINTS THAT HAVE NEWLY BEEN TRACKED
-        new_candidates = {}
-        new_candidates['C'] = new_candidates_list
-        new_candidates['F'] = new_candidates_list
-        new_candidates['T'] = np.stack([(np.eye(4) @ cur_pose) for _ in range(len(new_candidates_list))])
+        new_candidates_list, cur_des = self.find_new_candidates(old_frame, cur_frame, state, candidate_keypoints)
+        if debug:
+            print(f"new candidates list: {new_candidates_list}")
+        if len(new_candidates_list) > 0:
+            new_candidates = {}
+            new_candidates['C'] = new_candidates_list
+            new_candidates['F'] = new_candidates_list
+            new_candidates['T'] = np.stack([(np.eye(4) @ cur_pose) for _ in range(len(new_candidates_list))])
 
-        candidate_keypoints['C'] = np.concatenate((candidate_keypoints['C'], new_candidates['C']))
-        candidate_keypoints['F'] = np.concatenate((candidate_keypoints['F'], new_candidates['F']))
-        candidate_keypoints['T'] = np.concatenate((candidate_keypoints['T'], new_candidates['T'])) 
-        
+            if len(candidate_keypoints['C']) == 0:
+                candidate_keypoints['C'] = new_candidates['C']
+                candidate_keypoints['F'] = new_candidates['F']
+                candidate_keypoints['T'] = new_candidates['T']
+            else:
+                candidate_keypoints['C'] = np.concatenate((candidate_keypoints['C'], new_candidates['C']), axis=0)
+                candidate_keypoints['F'] = np.concatenate((candidate_keypoints['F'], new_candidates['F']), axis=0)
+                candidate_keypoints['T'] = np.concatenate((candidate_keypoints['T'], new_candidates['T']), axis=0) 
 
-        # UPDATE C OF CANDIDATE POINTS THAT HAVE BEEN RETRACKED
-        # Create a boolean mask to identify the positions of the tracked candidate keypoints to be updated
-        mask = np.isin(candidate_keypoints['C'], good_old)
-        # Update all the candidate keypoints that have been retracked
-        candidate_keypoints['C'][mask] = good_new
-    
+            len_ckC_step4 = len(candidate_keypoints['C'])
+            if debug:
+                print("\n---- ADD NEW CANDIDATE KEYPOINTS THAT HAVE NEWLY BEEN TRACKED ----")
+                print(f"new_candidates['C']: {new_candidates['C']}")
+                print(f"new_candidates['F']: {new_candidates['F']}")
+                print(f"new_candidates['T']: {new_candidates['T']}")
+                print(f"candidate_keypoints['C']: {candidate_keypoints['C']}")
+                print(f"candidate_keypoints['F']: {candidate_keypoints['F']}")
+                print(f"candidate_keypoints['T']: {candidate_keypoints['T']}")
+                print(f"len(candidate_keypoints['C']) dopo add new: {len(candidate_keypoints['C'])}")
+                print(f"len(candidate_keypoints['F']) dopo add new: {len(candidate_keypoints['F'])}")
+                print(f"len(candidate_keypoints['T']) dopo add new: {len(candidate_keypoints['T'])}")
+
 
         # VALIDATE NEW POINTS
         treshold = 5
         indices_to_validate = []
+        if debug:
+            print("\n---- VALIDATE NEW POINTS ----")
+            print(f"len(candidate_keypoints['C']): {len(candidate_keypoints['C'])}")
         # Consider all candidate keypoints
-        for idx in len(candidate_keypoints['C']):
+        for idx in range(len(candidate_keypoints['C'])):
             # Compute the bearing vector corresponding to the current observation
             uc, vc = candidate_keypoints['C'][idx]
             wc = np.sqrt(uc**2 + vc**2 + 1)
@@ -463,28 +575,75 @@ class LandmarkTriangulator():
             # Confront the angle with a treshold: if bigger, proceed to validate
             if alpha > treshold:
                 indices_to_validate.append(idx)
+            if debug:
+                # print(f"candidate_keypoints['C'][idx]: {candidate_keypoints['C'][idx]}")
+                # print(f"vector_a: {vector_a}")
+                # print(f"vector_b: {vector_b}")
+                # print(f"cos: {cos}")
+                # print(f"alpha: {alpha}")
+                if alpha > treshold:
+                    print(f"alpha > treshold: {alpha > treshold}")
+                # print(f"indices_to_validate: {indices_to_validate}")
 
+        if debug: 
+            print(f"ALL indices_to_validate: {indices_to_validate}")
+            print(f"number of validated ck: {len(indices_to_validate)}")
         for idx in indices_to_validate:
             # Add homogeneous coordinates (1) to the 2D points
-            point1 = np.hstack((candidate_keypoints['C'][idx], np.array((1))))
-            point2 = np.hstack((candidate_keypoints['F'][idx], np.array((1))))
-            
+            # point1 = np.hstack((candidate_keypoints['C'][idx], np.array((1))))
+            # point2 = np.hstack((candidate_keypoints['F'][idx], np.array((1))))
+            # print(f"point1: {point1}")
+            # print(f"point2: {point2}")
+
             # Triangulate the validated keypoint
-            point_3d_hom = cv2.triangulatePoints(cur_pose, candidate_keypoints['T'][idx], point1.T, point2.T)
+            point_3d_hom = cv2.triangulatePoints(cur_pose[0:3,:], candidate_keypoints['T'][idx][0:3,:], candidate_keypoints['C'][idx].T, candidate_keypoints['F'][idx].T)
             # Convert homogeneous coordinates to 3D coordinates
-            point_3d = cv2.convertPointsFromHomogeneous(point_3d_hom.T).reshape(-1, 3)
+            #point_3d = cv2.convertPointsFromHomogeneous(point_3d_hom.T).reshape(-1, 3)
+            point_3d = (point_3d_hom[0:3].T / point_3d_hom[3].T).T
 
             # Add the validated keypoint to the state
-            state['P'].append(candidate_keypoints['C'][idx])
-            state['X'].append(point_3d)
+            state['P'] = np.concatenate((state['P'], candidate_keypoints['C'][idx].reshape(1,2)), axis=0)
+            state['X'] = np.concatenate((state['X'], point_3d.reshape(1,3)), axis=0)
+            
+            if debug:
+                # print(f"point1: {point1}")
+                # print(f"point2: {point2}")
+                print(f"point_3d_hom: {point_3d_hom}")
+                print(f"point_3d: {point_3d}")
+                print(f"candidate_keypoints['C'] validated: {candidate_keypoints['C'][idx]}")
+                # print(f"state['P'] updated: {state['P']}")
+                # print(f"state['X'] updated: {state['X']}")
             
 
-        # Remove the validated keypoints from the candidate list
-        candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_validate)
-        candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_validate)
-        candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_validate)
+        # REMOVE THE VALIDATED KEYPOINTS FROM THE CANDIDATE LIST
+        if len(indices_to_validate) > 0:
+            candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_validate, axis=0)
+            candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_validate, axis=0)
+            candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_validate, axis=0)
+
+        len_ckC_step5 = len(candidate_keypoints['C'])
+        if debug:
+            print("\n---- REMOVE THE VALIDATED KEYPOINTS FROM THE CANDIDATE LIST ----")
+            print(f"candidate_keypoints['C'] updated: {candidate_keypoints['C']}")
+            print(f"candidate_keypoints['F'] updated: {candidate_keypoints['F']}")
+            print(f"candidate_keypoints['T'] updated: {candidate_keypoints['T']}")
+            print(f"len(candidate_keypoints['C']) dopo removal validated: {len(candidate_keypoints['C'])}")
+            print(f"len(candidate_keypoints['F']) dopo removal validated: {len(candidate_keypoints['F'])}")
+            print(f"len(candidate_keypoints['T']) dopo removal validated: {len(candidate_keypoints['T'])}")
+
+        if debug2:
+            print("\n\n---- SUM-UP CANDIDATE KEYPOINTS----")
+            print(f"len_ckC_step1 start: {len_ckC_step1}")
+            if len(p0)>0:
+                print(f"len_ckC_step2 after removal non-tracked: {len_ckC_step2}")
+                print(f"len_ckC_step3 after update retracked: {len_ckC_step3}")
+            if len(new_candidates_list) > 0:
+                print(f"len_ckC_step4 after add new ck: {len_ckC_step4}")
+            print(f"len_ckC_step5 after removal validated: {len_ckC_step5}")
+
+            print("---- SUM-UP STATE----")
+            print(f"len_stateP_start: {len_stateP_start}")
+            print(f"len_stateP_now: {len(state['P'])}")
 
 
-        
-
-        pass
+        return (state, candidate_keypoints, cur_des)
