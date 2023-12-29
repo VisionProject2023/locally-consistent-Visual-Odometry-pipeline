@@ -223,16 +223,16 @@ class VOInitializer():
 
 
 class KeypointsToLandmarksAssociator():
-    def __init__(self, K):
+    def __init__(self, K, current_pose):
         '''
         Initialize class
         '''
         self.K = K
-        #self.current_pose = current_pose
-        #in order to use the 1 point ransac I have to keep track of the last pose (pose of second frame 
-        # must be given in the init)
-
-        pass
+        self.current_pose = current_pose
+        # in order to use the 1 point ransac I have to keep track of the last pose (pose of second frame 
+        # must be given in the init).
+        # current_pose is a [R|t] matri that performs a change of basis
+        # from the first camera's coordinate system to the second camera's coordinate system
 
     def associateKeypoints(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict) -> dict:
         '''
@@ -291,7 +291,9 @@ class KeypointsToLandmarksAssociator():
         add_vector[3] = 1
         Hom = np.vstack((Hom, add_vector.T))
         hom_inv = np.linalg.inv(Hom)
+        hom_inv =  hom_inv @  np.vstack((self.current_pose, add_vector.T))
         state_found_x = state['X'][filter_status]
+        #I obtain a matrix from origin coordinates to current pose coordinate
         proj_points, jacob = cv2.projectPoints(state_found_x, hom_inv[0:3,0:3], hom_inv[0:3,3], self.K, None)
         proj_points = np.reshape(proj_points, (proj_points.shape[0], proj_points.shape[-1]))
         
@@ -314,6 +316,9 @@ class KeypointsToLandmarksAssociator():
         #TODO update our current pose based on the Nicola function
 
         return new_state
+    
+    def update_pose(self, pose:np.ndarray):
+        self.current_pose = pose
     
 
 class PoseEstimator():
