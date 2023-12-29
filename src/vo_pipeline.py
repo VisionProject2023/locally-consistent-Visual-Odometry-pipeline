@@ -321,6 +321,9 @@ class KeypointsToLandmarksAssociator():
     def update_pose(self, pose:np.ndarray):
         self.current_pose = pose
     
+    def update_pose(self, pose:np.ndarray):
+        self.current_pose = pose
+    
 
 class PoseEstimator():
     def __init__(self, K):
