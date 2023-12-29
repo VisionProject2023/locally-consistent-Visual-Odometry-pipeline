@@ -9,7 +9,7 @@ from vo_pipeline import *
 # Setup
 if config['dataset'] == 'kitti':
     # Set kitti_path to the folder containing "05" and "poses"
-    kitti_path = '../kitti'  # replace with your path
+    kitti_path = 'C:/Users/augus/OneDrive/Documenti/Augusto/Master ETH/ETH - First Semester/Vision Algorithms for Mobile Robotics/Project/BestVision/kitti'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
     last_frame = 4540
@@ -71,124 +71,149 @@ print("len P ",state['P'].shape)
 X = state['X']
 P = state['P']
 
-# plot the initialization images
-plt.figure(figsize=(10, 10))
-plt.imshow(img0, cmap='gray')
-plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20)
-plt.xlabel('x (pixesl)')
-plt.ylabel('y (pixels)')
-plt.title('Image 1')
-plt.show()
+# # plot the initialization images
+# plt.figure(figsize=(10, 10))
+# plt.imshow(img0, cmap='gray')
+# plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20)
+# plt.xlabel('x (pixels)')
+# plt.ylabel('y (pixels)')
+# plt.title('Image 1')
+# plt.show()
 
-plt.figure(figsize=(10, 10))
-plt.imshow(img0, cmap='gray')
-plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20)
-plt.xlabel('x (pixesl)')
-plt.ylabel('y (pixels)')
-plt.title('Image 2')
-plt.show()
+# plt.figure(figsize=(10, 10))
+# plt.imshow(img0, cmap='gray')
+# plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20)
+# plt.xlabel('x (pixels)')
+# plt.ylabel('y (pixels)')
+# plt.title('Image 2')
+# plt.show()
 
-# 3D plot of the initialization 3D landmarks (X)
-fig = plt.figure(figsize=(10, 10))
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(X[:, 0], X[:, 1], X[:, 2], c='r', s=20)
-ax.set_xlabel('x (m)')
-ax.set_ylabel('y (m)')
-ax.set_zlabel('z (m)')
-ax.set_title('3D landmarks (X)')
-plt.show()
+# # 3D plot of the initialization 3D landmarks (X)
+# fig = plt.figure(figsize=(10, 10))
+# ax = fig.add_subplot(111, projection='3d')
+# ax.scatter(X[:, 0], X[:, 1], X[:, 2], c='r', s=20)
+# ax.set_xlabel('x (m)')
+# ax.set_ylabel('y (m)')
+# ax.set_zlabel('z (m)')
+# ax.set_title('3D landmarks (X)')
+# plt.show()
 
-# plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
-print("dimensione ", img1_img2_pose_tranform.shape)
-T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
-t_inv = np.linalg.inv(T_hom)
-axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+# # plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
+# print("dimensione ", img1_img2_pose_tranform.shape)
+# T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
+# t_inv = np.linalg.inv(T_hom)
+# axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
-filter = np.linalg.norm(X, axis = 1) < 10
-print("filter len ", filter.shape)
-print("X shape ", X.shape)
-X_filtered = X[filter,:]
-plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
-plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
-plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
-plt.xlabel('X-axis')
-plt.ylabel('Z-axis')
-plt.ylim((0,10))
-plt.xlim((-5,5))
-plt.title('2D Points Visualization')
-plt.legend() # Show legend
-plt.show() # Show the plot
+# filter = np.linalg.norm(X, axis = 1) < 10
+# print("filter len ", filter.shape)
+# print("X shape ", X.shape)
+# X_filtered = X[filter,:]
+# plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
+# plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
+# plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
+# plt.xlabel('X-axis')
+# plt.ylabel('Z-axis')
+# plt.ylim((0,10))
+# plt.xlim((-5,5))
+# plt.title('2D Points Visualization')
+# plt.legend() # Show legend
+# plt.show() # Show the plot
 
-# plot all and filtered 2D keypoints (img 1)
-plt.imshow(img1)
-points = kps_1[filter, :]
-print("size filtered points ", points.shape)
-plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
-plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
-plt.plot()
-plt.show()
+# # plot all and filtered 2D keypoints (img 1)
+# plt.imshow(img1)
+# points = kps_1[filter, :]
+# print("size filtered points ", points.shape)
+# plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
+# plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
+# plt.plot()
+# plt.show()
 
-# plot all and filtered 2D keypoints (img 2)
-plt.imshow(img1)
-points2 = kps_2[filter,:]
-plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
-plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
-plt.plot()
-plt.show()
+# # plot all and filtered 2D keypoints (img 2)
+# plt.imshow(img1)
+# points2 = kps_2[filter,:]
+# plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
+# plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
+# plt.plot()
+# plt.show()
 
+debug = True
 ### - Continuous Operation
+candidate_keypoints = {}
+candidate_keypoints['C'] = np.array([])
+candidate_keypoints['F'] = np.array([])
+candidate_keypoints['T'] = np.array([])
 
 #instantiate BestVision:
 vision = BestVision(K)
 vision.state = state
+vision.candidate_keypoints = candidate_keypoints
+
+for img_idx in range(5,11):
+    print(f"\n\n\n\n---------- IMG {img_idx} ----------")
+    # loading the next image
+    if config['dataset'] == 'kitti':
+        img2 = cv2.imread(f'{kitti_path}/05/image_0/{img_idx:06d}.png', cv2.IMREAD_GRAYSCALE)
+
+    elif config['dataset'] == 'malaga':
+        img2 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[2]]}', cv2.IMREAD_GRAYSCALE)
+
+    elif config['dataset'] == 'parking':
+        img2 = cv2.imread(f'{parking_path}/images/img_{bootstrap_frames[2]:05d}.png', cv2.IMREAD_GRAYSCALE)
+
+    else:
+        raise ValueError("Invalid dataset selection")
+
+    # instantiate Landmark association
+    associate = KeypointsToLandmarksAssociator(K)
+    state_2, new_candidates_list = associate.associateKeypoints(img1,img2, vision.state)
+    if debug:
+        print(f"new_candidates_list: {new_candidates_list}")
+        print(f"len(state_2['P']): {len(state_2['P'])}")
+
+    pose_estimator = PoseEstimator(K)
+    T_world_newframe = pose_estimator.estimatePose(state_2)
+    if debug:
+        print(f"T_world_newframe: {T_world_newframe}")
+
+    landmark_triangulator = LandmarkTriangulator(K)
+    new_state, candidate_keypoints = landmark_triangulator.triangulateLandmark(img1, img2, state_2, candidate_keypoints, new_candidates_list, T_world_newframe)
+    # if debug:
+    #     print(f"new_state: {new_state}")
+    #     print(f"candidate_keypoints: {candidate_keypoints}")
+
+    vision.state = new_state
+    vision.candidate_keypoints = candidate_keypoints
+    # if debug:
+    #     print(f"vision.state: {vision.state}")
+    #     print(f"vision.candidate_keypoints: {vision.candidate_keypoints}")
 
 
-# loading the next image
-if config['dataset'] == 'kitti':
-    img2 = cv2.imread(f'{kitti_path}/05/image_0/{5:06d}.png', cv2.IMREAD_GRAYSCALE)
+# # ***** DEBUG *****
+# # plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
+# print("dimensione ", img1_img2_pose_tranform.shape)
+# T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
+# t_inv = np.linalg.inv(T_hom)
+# axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
-elif config['dataset'] == 'malaga':
-    img2 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[2]]}', cv2.IMREAD_GRAYSCALE)
+# t_inv_2 = np.linalg.inv(T_world_newframe)
+# axis_2 = t_inv_2 @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
-elif config['dataset'] == 'parking':
-    img2 = cv2.imread(f'{parking_path}/images/img_{bootstrap_frames[2]:05d}.png', cv2.IMREAD_GRAYSCALE)
-
-else:
-    raise ValueError("Invalid dataset selection")
-
-# instantiate Landmark association
-associate = KeypointsToLandmarksAssociator(K)
-state_2 = associate.associateKeypoints(img1,img2, vision.state)
-
-pose_estimator = PoseEstimator(K)
-T_world_newframe = pose_estimator.estimatePose(state_2)
-
-# ***** DEBUG *****
-# plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
-print("dimensione ", img1_img2_pose_tranform.shape)
-T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
-t_inv = np.linalg.inv(T_hom)
-axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
-
-t_inv_2 = np.linalg.inv(T_world_newframe)
-axis_2 = t_inv_2 @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
-
-filter = np.linalg.norm(X, axis = 1) < 10
-print("filter len ", filter.shape)
-print("X shape ", X.shape)
-X_filtered = X[filter,:]
-plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
-plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
-plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
-plt.plot([axis_2[0,3],axis_2[0,0]],[axis_2[2,3], axis_2[2,0]], 'b-')
-plt.plot([axis_2[0,3],axis_2[0,2]],[axis_2[2,3], axis_2[2,2]], 'b-')
-plt.xlabel('X-axis')
-plt.ylabel('Z-axis')
-plt.ylim((0,10))
-plt.xlim((-5,5))
-plt.title('2D Points Visualization')
-plt.legend() # Show legend
-plt.show() # Show the plot
+# filter = np.linalg.norm(X, axis = 1) < 10
+# print("filter len ", filter.shape)
+# print("X shape ", X.shape)
+# X_filtered = X[filter,:]
+# plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
+# plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
+# plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
+# plt.plot([axis_2[0,3],axis_2[0,0]],[axis_2[2,3], axis_2[2,0]], 'b-')
+# plt.plot([axis_2[0,3],axis_2[0,2]],[axis_2[2,3], axis_2[2,2]], 'b-')
+# plt.xlabel('X-axis')
+# plt.ylabel('Z-axis')
+# plt.ylim((0,10))
+# plt.xlim((-5,5))
+# plt.title('2D Points Visualization')
+# plt.legend() # Show legend
+# plt.show() # Show the plot
 # *****************
 
 # %%
