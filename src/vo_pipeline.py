@@ -232,8 +232,8 @@ class KeypointsToLandmarksAssociator():
         self.current_pose = current_pose
         # in order to use the 1 point ransac I have to keep track of the last pose (pose of second frame 
         # must be given in the init).
-        # current_pose is a [R|t] matri that performs a change of basis
-        # from the first camera's coordinate system to the second camera's coordinate system
+        # current_pose is a Homo matrix that performs a change of basis from the first 
+        # camera's coordinate system to the second camera's coordinate system
 
     def associateKeypoints(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict) -> dict:
         '''
@@ -276,34 +276,69 @@ class KeypointsToLandmarksAssociator():
         #we generate all the possible thetas, and then generate an histogram
         hist, batch = np.histogram(thetas)
         print("hist ", hist)
+        print("batch", batch)
         theta_max = np.median(thetas)
         print("THETA_MAX ", theta_max * 180 / np.pi)
+        if theta_max * 180 / np.pi < 5:
+            theta_max = 0
         #I can decide to minimize the reprojection error o remove the ones that are outside a ccertain range
-        R = np.array([[np.cos(theta_max), - np.sin(theta_max), 0],
-                     [np.sin(theta_max),   np.cos(theta_max), 0],
-                     [0 ,                0,                   1]])
+        R = np.array([[np.cos(theta_max), 0, - np.sin(theta_max)],
+                      [0,                  1,                  0],
+                      [np.sin(theta_max), 0,  np.cos(theta_max)]])
         #the paper (Scaramuzza) says that I can set rho to  1, see if it make sense with the reprojected points
-        rho = 0.2
-        T = rho * np.array([np.cos(theta_max/2), np.sin(theta_max/2), 0])
-        #reprojection error:
+        rho = 0.3
+        T = rho * np.array([-np.sin(theta_max/2),  0, np.cos(theta_max/2)])
+        #---- reprojection error -----:
+
         T_i = np.reshape(T,(T.shape[0],1))
+        print("T_i ", T_i)
+        #Hom = from new position oordinates to old frame oordinate
         Hom = np.hstack((R,T_i))
         add_vector = np.zeros((4,1))
         add_vector[3] = 1
         Hom = np.vstack((Hom, add_vector.T))
         hom_inv = np.linalg.inv(Hom)
-        hom_inv =  hom_inv @  np.vstack((self.current_pose, add_vector.T))
+        hom_inv =  hom_inv @  self.current_pose
+        print("real angle ", np.arccos(hom_inv[0,0]) * 180 / np.pi)
+        print("pose now ")
+        print(hom_inv)
+        
+        #--DEBUG--- 3d view of the car direction:
+        axis1 = np.linalg.inv(self.current_pose) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+        axis2 = np.linalg.inv(hom_inv) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+        plt.plot([axis1[0,3],axis1[0,0]],[axis1[2,3], axis1[2,0]], 'r-')
+        plt.plot([axis1[0,3],axis1[0,2]],[axis1[2,3], axis1[2,2]], 'g-')
+        plt.plot([axis2[0,3],axis2[0,0]],[axis2[2,3], axis2[2,0]], 'b-')
+        plt.plot([axis2[0,3],axis2[0,2]],[axis2[2,3], axis2[2,2]], 'g-')
+        plt.xlabel('X-axis')
+        plt.ylabel('Z-axis')
+        plt.ylim((0,10))
+        plt.xlim((-5,5))
+        plt.title('move Visualization')
+        plt.legend() # Show legend
+        plt.show() # Show the plot
+
         state_found_x = state['X'][filter_status]
         #I obtain a matrix from origin coordinates to current pose coordinate
         proj_points, jacob = cv2.projectPoints(state_found_x, hom_inv[0:3,0:3], hom_inv[0:3,3], self.K, None)
         proj_points = np.reshape(proj_points, (proj_points.shape[0], proj_points.shape[-1]))
         
         print("drawing ......")
-        plt.imshow(old_frame)
-        filter3 = np.linalg.norm(next_points-proj_points, axis = 1) < 10
+        plt.imshow(new_frame)
+        filter3 = np.linalg.norm(next_points-proj_points, axis = 1) < 30
         plt.scatter(proj_points[filter3,0], proj_points[filter3,1], color='blue', marker='o', label='Points')
-        plt.scatter(next_points[filter3,0], next_points[filter3,1], color='red', marker='o', label='Points')
         plt.scatter(next_points[filter3,0], next_points[filter3,1], color='green', marker='o', label='Points')
+        # plt.xlim((0,1200))
+        plt.plot()
+        plt.show()
+
+        print("drawing 2......")
+        plt.imshow(new_frame)
+        filter3_n = np.logical_not(filter3)
+        plt.scatter(proj_points[filter3_n,0], proj_points[filter3_n,1], color='blue', marker='o', label='Points')
+        plt.scatter(next_points[filter3_n,0], next_points[filter3_n,1], color='red', marker='o', label='Points')
+        plt.ylim((400,0))
+        plt.xlim((0,1220))
         # plt.xlim((0,1200))
         plt.plot()
         plt.show()
@@ -314,16 +349,10 @@ class KeypointsToLandmarksAssociator():
         #new_state = {'P': new_P_error_free, 'X': next_points[filter3]}
         new_state = {'P': next_points[filter3], 'X': state_found_x[filter3]}
 
-        #TODO update our current pose based on the Nicola function
-
         return (new_state, next_point_for_august)
     
     def update_pose(self, pose:np.ndarray):
         self.current_pose = pose
-    
-    def update_pose(self, pose:np.ndarray):
-        self.current_pose = pose
-    
 
 class PoseEstimator():
     def __init__(self, K):
@@ -358,7 +387,7 @@ class PoseEstimator():
                                                         reprojectionError=self.REPOJ_THRESH)
         
         R, _ = cv2.Rodrigues(R_vec)
-
+        print("real angle ", np.arccos(R[0,0]) * 180 / np.pi)
         # add nonlinear refinement with --> solvePnPRefineLM
         
         T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([[0,0,0,1]])], axis=0)

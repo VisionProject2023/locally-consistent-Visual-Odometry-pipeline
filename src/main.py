@@ -9,7 +9,7 @@ from vo_pipeline import *
 # Setup
 if config['dataset'] == 'kitti':
     # Set kitti_path to the folder containing "05" and "poses"
-    kitti_path = 'C:/Users/augus/OneDrive/Documenti/Augusto/Master ETH/ETH - First Semester/Vision Algorithms for Mobile Robotics/Project/BestVision/kitti'  # replace with your path
+    kitti_path = '../kitti'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
     last_frame = 4540
@@ -89,14 +89,14 @@ plt.title('Image 2')
 plt.show()
 
 # 3D plot of the initialization 3D landmarks (X)
-fig = plt.figure(figsize=(10, 10))
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(X[:, 0], X[:, 1], X[:, 2], c='r', s=20)
-ax.set_xlabel('x (m)')
-ax.set_ylabel('y (m)')
-ax.set_zlabel('z (m)')
-ax.set_title('3D landmarks (X)')
-plt.show()
+# fig = plt.figure(figsize=(10, 10))
+# ax = fig.add_subplot(111, projection='3d')
+# ax.scatter(X[:, 0], X[:, 1], X[:, 2], c='r', s=20)
+# ax.set_xlabel('x (m)')
+# ax.set_ylabel('y (m)')
+# ax.set_zlabel('z (m)')
+# ax.set_title('3D landmarks (X)')
+# plt.show()
 
 # plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
 print("dimensione ", img1_img2_pose_tranform.shape)
@@ -105,6 +105,8 @@ t_inv = np.linalg.inv(T_hom)
 axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
 filter = np.linalg.norm(X, axis = 1) < 10
+filter_add = np.linalg.norm(X, axis = 1) > 3
+filter = filter * filter_add
 print("filter len ", filter.shape)
 print("X shape ", X.shape)
 X_filtered = X[filter,:]
@@ -154,6 +156,8 @@ print(f"img1_img2_pose_tranform.shape: {img1_img2_pose_tranform.shape}")
 vision = BestVision(K)
 vision.state = state
 vision.candidate_keypoints = candidate_keypoints
+associate = KeypointsToLandmarksAssociator(K, T_hom)
+pose_estimator = PoseEstimator(K)
 
 for img_idx in range(5,110):
     print(f"\n\n\n\n---------- IMG {img_idx} ----------")
@@ -171,16 +175,16 @@ for img_idx in range(5,110):
         raise ValueError("Invalid dataset selection")
 
     # instantiate Landmark association
-    associate = KeypointsToLandmarksAssociator(K, cur_pose[0:3,:])
+
     state_2, new_candidates_list = associate.associateKeypoints(img1,img2, vision.state)
     if debug:
         print(f"new_candidates_list: {new_candidates_list}")
         print(f"len(state_2['P']): {len(state_2['P'])}")
 
-    pose_estimator = PoseEstimator(K)
     T_world_newframe = pose_estimator.estimatePose(state_2)
     if debug:
         print(f"T_world_newframe: {T_world_newframe}")
+    associate.update_pose(T_world_newframe)
 
     landmark_triangulator = LandmarkTriangulator(K, old_des)
     new_state, candidate_keypoints, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, state_2, candidate_keypoints, new_candidates_list, T_world_newframe)
@@ -209,6 +213,8 @@ t_inv_2 = np.linalg.inv(T_world_newframe)
 axis_2 = t_inv_2 @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
 filter = np.linalg.norm(X, axis = 1) < 10
+filter_add = np.linalg.norm(X, axis = 1) > 3
+filter = filter * filter_add
 print("filter len ", filter.shape)
 print("X shape ", X.shape)
 X_filtered = X[filter,:]
