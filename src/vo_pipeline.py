@@ -281,7 +281,7 @@ class KeypointsToLandmarksAssociator():
         print("THETA_MAX ", theta_max * 180 / np.pi)
         if theta_max * 180 / np.pi < 5:
             theta_max = 0
-        #I can decide to minimize the reprojection error o remove the ones that are outside a ccertain range
+        #I can decide to minimize the reprojection error or remove the ones that are outside a certain range
         R = np.array([[np.cos(theta_max), 0, - np.sin(theta_max)],
                       [0,                  1,                  0],
                       [np.sin(theta_max), 0,  np.cos(theta_max)]])

@@ -6,10 +6,12 @@ import cv2
 import matplotlib.pyplot as plt
 from vo_pipeline import *
 
+debug = config['debug']
+
 # Setup
 if config['dataset'] == 'kitti':
     # Set kitti_path to the folder containing "05" and "poses"
-    kitti_path = '../kitti'  # replace with your path
+    kitti_path = 'kitti'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
     last_frame = 4540
@@ -138,7 +140,7 @@ plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered
 plt.plot()
 plt.show()
 
-debug = True
+
 ### - Continuous Operation
 candidate_keypoints = {}
 candidate_keypoints['C'] = np.array([])
@@ -152,13 +154,13 @@ cur_pose = img1_img2_pose_tranform
 print(f"img1_img2_pose_tranform: {img1_img2_pose_tranform}")
 print(f"img1_img2_pose_tranform.shape: {img1_img2_pose_tranform.shape}")
 
-#instantiate BestVision:
-vision = BestVision(K)
+vision = BestVision(K) #instantiate BestVision:
 vision.state = state
 vision.candidate_keypoints = candidate_keypoints
 associate = KeypointsToLandmarksAssociator(K, T_hom)
 pose_estimator = PoseEstimator(K)
 
+# loop over all the images
 for img_idx in range(5,110):
     print(f"\n\n\n\n---------- IMG {img_idx} ----------")
     # loading the next image
@@ -181,13 +183,16 @@ for img_idx in range(5,110):
         print(f"new_candidates_list: {new_candidates_list}")
         print(f"len(state_2['P']): {len(state_2['P'])}")
 
+    # estimate the pose of the new frame
     T_world_newframe = pose_estimator.estimatePose(state_2)
     if debug:
         print(f"T_world_newframe: {T_world_newframe}")
     associate.update_pose(T_world_newframe)
 
+    # triangulate landmarks
     landmark_triangulator = LandmarkTriangulator(K, old_des)
     new_state, candidate_keypoints, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, state_2, candidate_keypoints, new_candidates_list, T_world_newframe)
+    
     # if debug:
     #     print(f"new_state: {new_state}")
     #     print(f"candidate_keypoints: {candidate_keypoints}")
