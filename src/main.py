@@ -17,7 +17,7 @@ if config['dataset'] == 'kitti':
                   [0, 718.856, 185.2157],
                   [0, 0, 1]])
     
-    bootstrap_frames = [0, 4]
+    bootstrap_frames = [0, 2]
     img0 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[0]:06d}.png', cv2.IMREAD_GRAYSCALE)
     img1 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[1]:06d}.png', cv2.IMREAD_GRAYSCALE)
 
@@ -104,7 +104,7 @@ T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
 t_inv = np.linalg.inv(T_hom)
 axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
-filter = np.linalg.norm(X, axis = 1) < 10
+filter = np.linalg.norm(X, axis = 1) < 50
 filter_add = np.linalg.norm(X, axis = 1) > 3
 filter = filter * filter_add
 print("filter len ", filter.shape)
@@ -115,8 +115,8 @@ plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
 plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
 plt.xlabel('X-axis')
 plt.ylabel('Z-axis')
-plt.ylim((0,10))
-plt.xlim((-5,5))
+plt.ylim((0,50))
+plt.xlim((-15,15))
 plt.title('2D Points Visualization')
 plt.legend() # Show legend
 plt.show() # Show the plot
@@ -159,7 +159,7 @@ vision.candidate_keypoints = candidate_keypoints
 associate = KeypointsToLandmarksAssociator(K, T_hom)
 pose_estimator = PoseEstimator(K)
 
-for img_idx in range(5,110):
+for img_idx in range(3,40):
     print(f"\n\n\n\n---------- IMG {img_idx} ----------")
     # loading the next image
     if config['dataset'] == 'kitti':
@@ -185,6 +185,25 @@ for img_idx in range(5,110):
     if debug:
         print(f"T_world_newframe: {T_world_newframe}")
     associate.update_pose(T_world_newframe)
+    print("T_world_new_frame")
+    print(T_world_newframe)
+    axis = np.linalg.inv(T_world_newframe) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+    X = vision.state['X']
+    filter = np.linalg.norm(X, axis = 1) < 20
+    filter_add = np.linalg.norm(X, axis = 1) > 3
+    filter = filter * filter_add
+    print("filter len ", filter.shape)
+    print("X shape ", X.shape)
+    X_filtered = X[filter,:]
+    plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
+
+    plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'b-')
+    plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
+    plt.xlabel('X-axis')
+    plt.ylabel('Z-axis')
+    plt.axis('square')
+    plt.title('2D Points Visualization')
+    plt.show()
 
     landmark_triangulator = LandmarkTriangulator(K, old_des)
     new_state, candidate_keypoints, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, state_2, candidate_keypoints, new_candidates_list, T_world_newframe)
@@ -200,7 +219,6 @@ for img_idx in range(5,110):
     # if debug:
     #     print(f"vision.state: {vision.state}")
     #     print(f"vision.candidate_keypoints: {vision.candidate_keypoints}")
-
 
 # ***** DEBUG *****
 # plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
