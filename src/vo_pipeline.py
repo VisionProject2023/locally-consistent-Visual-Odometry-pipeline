@@ -272,7 +272,7 @@ class KeypointsToLandmarksAssociator():
         # I imagine a 2 x N array
         #thetas should be a 1 x N array
         #paper scaramuzza: https://rpg.ifi.uzh.ch/docs/IJCV11_scaramuzza.pdf
-        thetas = -2 * np.arctan((next_points[:,0]-state_p_found[:,0])/(next_points[:,1]+state_p_found[:,1]))
+        thetas = -2 * np.arctan((next_points[:,1]-state_p_found[:,1])/(next_points[:,0]+state_p_found[:,0]))
         #we generate all the possible thetas, and then generate an histogram
         hist, batch = np.histogram(thetas)
         print("hist ", hist)
@@ -299,49 +299,47 @@ class KeypointsToLandmarksAssociator():
         Hom = np.vstack((Hom, add_vector.T))
         hom_inv = np.linalg.inv(Hom)
         hom_inv =  hom_inv @  self.current_pose
-        print("real angle ", np.arccos(hom_inv[0,0]) * 180 / np.pi)
-        print("pose now ")
-        print(hom_inv)
+        print("scara angle of coordinate system", np.arccos(hom_inv[0,0]) * 180 / np.pi)
         
         #--DEBUG--- 3d view of the car direction:
         axis1 = np.linalg.inv(self.current_pose) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
         axis2 = np.linalg.inv(hom_inv) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
-        plt.plot([axis1[0,3],axis1[0,0]],[axis1[2,3], axis1[2,0]], 'r-')
-        plt.plot([axis1[0,3],axis1[0,2]],[axis1[2,3], axis1[2,2]], 'g-')
-        plt.plot([axis2[0,3],axis2[0,0]],[axis2[2,3], axis2[2,0]], 'b-')
-        plt.plot([axis2[0,3],axis2[0,2]],[axis2[2,3], axis2[2,2]], 'g-')
-        plt.xlabel('X-axis')
-        plt.ylabel('Z-axis')
-        plt.ylim((0,10))
-        plt.xlim((-5,5))
-        plt.title('move Visualization')
-        plt.legend() # Show legend
-        plt.show() # Show the plot
+        # plt.plot([axis1[0,3],axis1[0,0]],[axis1[2,3], axis1[2,0]], 'r-')
+        # plt.plot([axis1[0,3],axis1[0,2]],[axis1[2,3], axis1[2,2]], 'g-')
+        # plt.plot([axis2[0,3],axis2[0,0]],[axis2[2,3], axis2[2,0]], 'b-')
+        # plt.plot([axis2[0,3],axis2[0,2]],[axis2[2,3], axis2[2,2]], 'g-')
+        # plt.xlabel('X-axis')
+        # plt.ylabel('Z-axis')
+        # plt.ylim((0,10))
+        # plt.xlim((-5,5))
+        # plt.title('move Visualization')
+        # plt.legend() # Show legend
+        # plt.show() # Show the plot
 
         state_found_x = state['X'][filter_status]
         #I obtain a matrix from origin coordinates to current pose coordinate
         proj_points, jacob = cv2.projectPoints(state_found_x, hom_inv[0:3,0:3], hom_inv[0:3,3], self.K, None)
         proj_points = np.reshape(proj_points, (proj_points.shape[0], proj_points.shape[-1]))
         
-        print("drawing ......")
-        plt.imshow(new_frame)
-        filter3 = np.linalg.norm(next_points-proj_points, axis = 1) < 30
-        plt.scatter(proj_points[filter3,0], proj_points[filter3,1], color='blue', marker='o', label='Points')
-        plt.scatter(next_points[filter3,0], next_points[filter3,1], color='green', marker='o', label='Points')
-        # plt.xlim((0,1200))
-        plt.plot()
-        plt.show()
+        # print("drawing ......")
+        # plt.imshow(new_frame)
+        filter3 = np.linalg.norm(next_points-proj_points, axis = 1) < 100
+        # plt.scatter(proj_points[filter3,0], proj_points[filter3,1], color='blue', marker='o', label='Points')
+        # plt.scatter(next_points[filter3,0], next_points[filter3,1], color='green', marker='o', label='Points')
+        # # plt.xlim((0,1200))
+        # plt.plot()
+        # plt.show()
 
-        print("drawing 2......")
-        plt.imshow(new_frame)
-        filter3_n = np.logical_not(filter3)
-        plt.scatter(proj_points[filter3_n,0], proj_points[filter3_n,1], color='blue', marker='o', label='Points')
-        plt.scatter(next_points[filter3_n,0], next_points[filter3_n,1], color='red', marker='o', label='Points')
-        plt.ylim((400,0))
-        plt.xlim((0,1220))
-        # plt.xlim((0,1200))
-        plt.plot()
-        plt.show()
+        # print("drawing 2......")
+        # plt.imshow(new_frame)
+        # filter3_n = np.logical_not(filter3)
+        # plt.scatter(proj_points[filter3_n,0], proj_points[filter3_n,1], color='blue', marker='o', label='Points')
+        # plt.scatter(next_points[filter3_n,0], next_points[filter3_n,1], color='red', marker='o', label='Points')
+        # plt.ylim((400,0))
+        # plt.xlim((0,1220))
+        # # plt.xlim((0,1200))
+        # plt.plot()
+        # plt.show()
 
         #return new status and connection
         new_P_error_free = state_p_found[filter3]
