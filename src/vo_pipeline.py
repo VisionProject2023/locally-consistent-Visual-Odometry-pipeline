@@ -204,7 +204,7 @@ class VOInitializer():
         _, R, t, _ = cv2.recoverPose(E, kps_f1, kps_f2, self.K, mask=mask) #recoverPose enforces the 
 
         # Output transformation matrix (not homogeneous!)
-        return np.hstack((R, t))
+        return np.hstack((R, t)), mask
     
     def get_2D_3D_landmarks_association(self, kps_1: np.ndarray, kps_2: np.ndarray, T_img1_img2: np.ndarray) -> Dict:
         
@@ -272,38 +272,38 @@ class KeypointsToLandmarksAssociator():
         # I imagine a 2 x N array
         #thetas should be a 1 x N array
         #paper scaramuzza: https://rpg.ifi.uzh.ch/docs/IJCV11_scaramuzza.pdf
-        thetas = -2 * np.arctan((next_points[:,1]-state_p_found[:,1])/(next_points[:,0]+state_p_found[:,0]))
-        #we generate all the possible thetas, and then generate an histogram
-        hist, batch = np.histogram(thetas)
-        print("hist ", hist)
-        print("batch", batch)
-        theta_max = np.median(thetas)
-        print("THETA_MAX ", theta_max * 180 / np.pi)
-        if theta_max * 180 / np.pi < 5:
-            theta_max = 0
-        #I can decide to minimize the reprojection error o remove the ones that are outside a ccertain range
-        R = np.array([[np.cos(theta_max), 0, - np.sin(theta_max)],
-                      [0,                  1,                  0],
-                      [np.sin(theta_max), 0,  np.cos(theta_max)]])
-        #the paper (Scaramuzza) says that I can set rho to  1, see if it make sense with the reprojected points
-        rho = 0.3
-        T = rho * np.array([-np.sin(theta_max/2),  0, np.cos(theta_max/2)])
-        #---- reprojection error -----:
+        # thetas = -2 * np.arctan((next_points[:,1]-state_p_found[:,1])/(next_points[:,0]+state_p_found[:,0]))
+        # #we generate all the possible thetas, and then generate an histogram
+        # hist, batch = np.histogram(thetas)
+        # print("hist ", hist)
+        # print("batch", batch)
+        # theta_max = np.median(thetas)
+        # print("THETA_MAX ", theta_max * 180 / np.pi)
+        # if theta_max * 180 / np.pi < 5:
+        #     theta_max = 0
+        # #I can decide to minimize the reprojection error o remove the ones that are outside a ccertain range
+        # R = np.array([[np.cos(theta_max), 0, - np.sin(theta_max)],
+        #               [0,                  1,                  0],
+        #               [np.sin(theta_max), 0,  np.cos(theta_max)]])
+        # #the paper (Scaramuzza) says that I can set rho to  1, see if it make sense with the reprojected points
+        # rho = 0.3
+        # T = rho * np.array([-np.sin(theta_max/2),  0, np.cos(theta_max/2)])
+        # #---- reprojection error -----:
 
-        T_i = np.reshape(T,(T.shape[0],1))
-        print("T_i ", T_i)
-        #Hom = from new position oordinates to old frame oordinate
-        Hom = np.hstack((R,T_i))
-        add_vector = np.zeros((4,1))
-        add_vector[3] = 1
-        Hom = np.vstack((Hom, add_vector.T))
-        hom_inv = np.linalg.inv(Hom)
-        hom_inv =  hom_inv @  self.current_pose
-        print("scara angle of coordinate system", np.arccos(hom_inv[0,0]) * 180 / np.pi)
+        # T_i = np.reshape(T,(T.shape[0],1))
+        # print("T_i ", T_i)
+        # #Hom = from new position oordinates to old frame oordinate
+        # Hom = np.hstack((R,T_i))
+        # add_vector = np.zeros((4,1))
+        # add_vector[3] = 1
+        # Hom = np.vstack((Hom, add_vector.T))
+        # hom_inv = np.linalg.inv(Hom)
+        # hom_inv =  hom_inv @  self.current_pose
+        # print("scara angle of coordinate system", np.arccos(hom_inv[0,0]) * 180 / np.pi)
         
         #--DEBUG--- 3d view of the car direction:
-        axis1 = np.linalg.inv(self.current_pose) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
-        axis2 = np.linalg.inv(hom_inv) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+        # axis1 = np.linalg.inv(self.current_pose) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+        # axis2 = np.linalg.inv(hom_inv) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
         # plt.plot([axis1[0,3],axis1[0,0]],[axis1[2,3], axis1[2,0]], 'r-')
         # plt.plot([axis1[0,3],axis1[0,2]],[axis1[2,3], axis1[2,2]], 'g-')
         # plt.plot([axis2[0,3],axis2[0,0]],[axis2[2,3], axis2[2,0]], 'b-')
@@ -317,13 +317,13 @@ class KeypointsToLandmarksAssociator():
         # plt.show() # Show the plot
 
         state_found_x = state['X'][filter_status]
-        #I obtain a matrix from origin coordinates to current pose coordinate
-        proj_points, jacob = cv2.projectPoints(state_found_x, hom_inv[0:3,0:3], hom_inv[0:3,3], self.K, None)
-        proj_points = np.reshape(proj_points, (proj_points.shape[0], proj_points.shape[-1]))
+        # #I obtain a matrix from origin coordinates to current pose coordinate
+        # proj_points, jacob = cv2.projectPoints(state_found_x, hom_inv[0:3,0:3], hom_inv[0:3,3], self.K, None)
+        # proj_points = np.reshape(proj_points, (proj_points.shape[0], proj_points.shape[-1]))
         
-        # print("drawing ......")
-        # plt.imshow(new_frame)
-        filter3 = np.linalg.norm(next_points-proj_points, axis = 1) < 100
+        # # print("drawing ......")
+        # # plt.imshow(new_frame)
+        # filter3 = np.linalg.norm(next_points-proj_points, axis = 1) < 100
         # plt.scatter(proj_points[filter3,0], proj_points[filter3,1], color='blue', marker='o', label='Points')
         # plt.scatter(next_points[filter3,0], next_points[filter3,1], color='green', marker='o', label='Points')
         # # plt.xlim((0,1200))
@@ -342,11 +342,11 @@ class KeypointsToLandmarksAssociator():
         # plt.show()
 
         #return new status and connection
-        new_P_error_free = state_p_found[filter3]
-        print("len P no error ", new_P_error_free.shape)
+        # new_P_error_free = state_p_found[filter3]
+        # print("len P no error ", new_P_error_free.shape)
         #new_state = {'P': new_P_error_free, 'X': next_points[filter3]}
-        new_state = {'P': next_points[filter3], 'X': state_found_x[filter3]}
-
+        # new_state = {'P': next_points[filter3], 'X': state_found_x[filter3]}
+        new_state = {'P': next_points, 'X': state_found_x}
         return (new_state, next_point_for_august)
     
     def update_pose(self, pose:np.ndarray):
@@ -360,7 +360,7 @@ class PoseEstimator():
         self.K = K
 
         """ Constants """
-        self.REPOJ_THRESH = 1      # threshold on the reprojection error of points accepted as inliers
+        self.REPOJ_THRESH = 2      # threshold on the reprojection error of points accepted as inliers
         self.CONFIDENCE = 0.9999   # dsired confidence of result
     
     def estimatePose(self, associations: Dict[np.ndarray,np.ndarray]) -> np.ndarray:
@@ -387,7 +387,12 @@ class PoseEstimator():
         R, _ = cv2.Rodrigues(R_vec)
         print("real angle ", np.arccos(R[0,0]) * 180 / np.pi)
         # add nonlinear refinement with --> solvePnPRefineLM
-        
+        inliers = np.hstack(inliers)
+        print(inliers[0:10])
+        print("shape pre modifia ", associations['X'].shape)
+        associations['P'] = associations['P'][inliers,:]
+        associations['X'] = associations['X'][inliers,:]
+        print("shape pos modifia ", associations['X'].shape)
         T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([[0,0,0,1]])], axis=0)
         return T
 
@@ -467,7 +472,7 @@ class LandmarkTriangulator():
         # new. I also proceed to remove the candidate_points that have not been re-identified
 
         debug = False
-        debug2 = True
+        debug2 = False
         print("\n\n---------- TRIANGULATE LANDMARK ----------")
 
         # TRACK CANDIDATE KEYPOINTS
@@ -575,7 +580,9 @@ class LandmarkTriangulator():
 
 
         # VALIDATE NEW POINTS
-        treshold = 5
+        treshold = 1
+        #debug
+        alphas = []
         indices_to_validate = []
         if debug:
             print("\n---- VALIDATE NEW POINTS ----")
@@ -598,6 +605,7 @@ class LandmarkTriangulator():
             cos = np.clip(cos, -1.0, 1.0)
             # Calculate the angle
             alpha = np.degrees(np.arccos(cos))
+            alphas.append(alpha)
 
             # Confront the angle with a treshold: if bigger, proceed to validate
             if alpha > treshold:
@@ -615,15 +623,17 @@ class LandmarkTriangulator():
         if debug: 
             print(f"ALL indices_to_validate: {indices_to_validate}")
             print(f"number of validated ck: {len(indices_to_validate)}")
+        point_3d_prin = []
+        pose_3d_prin = []
         for idx in indices_to_validate:
             # Add homogeneous coordinates (1) to the 2D points
             # point1 = np.hstack((candidate_keypoints['C'][idx], np.array((1))))
             # point2 = np.hstack((candidate_keypoints['F'][idx], np.array((1))))
             # print(f"point1: {point1}")
             # print(f"point2: {point2}")
-
+            pose_3d_prin.append(candidate_keypoints['T'][idx])
             # Triangulate the validated keypoint
-            point_3d_hom = cv2.triangulatePoints(cur_pose[0:3,:], candidate_keypoints['T'][idx][0:3,:], candidate_keypoints['C'][idx].T, candidate_keypoints['F'][idx].T)
+            point_3d_hom = cv2.triangulatePoints(self.K @ candidate_keypoints['T'][idx][0:3,:], self.K @ cur_pose[0:3,:], candidate_keypoints['F'][idx].T,  candidate_keypoints['C'][idx].T)
             # Convert homogeneous coordinates to 3D coordinates
             #point_3d = cv2.convertPointsFromHomogeneous(point_3d_hom.T).reshape(-1, 3)
             point_3d = (point_3d_hom[0:3].T / point_3d_hom[3].T).T
@@ -631,6 +641,7 @@ class LandmarkTriangulator():
             # Add the validated keypoint to the state
             state['P'] = np.concatenate((state['P'], candidate_keypoints['C'][idx].reshape(1,2)), axis=0)
             state['X'] = np.concatenate((state['X'], point_3d.reshape(1,3)), axis=0)
+            point_3d_prin.append(point_3d.reshape(3))
             
             if debug:
                 # print(f"point1: {point1}")
@@ -640,6 +651,37 @@ class LandmarkTriangulator():
                 print(f"candidate_keypoints['C'] validated: {candidate_keypoints['C'][idx]}")
                 # print(f"state['P'] updated: {state['P']}")
                 # print(f"state['X'] updated: {state['X']}")
+        point_3d_prin = np.array(point_3d_prin)
+        # print("poin 3d prin")
+        # print(point_3d_prin.shape)
+        # print("drawing ......")
+        # plt.imshow(cur_frame)
+        # plt.scatter(candidate_keypoints['C'][indices_to_validate,0],candidate_keypoints['C'][indices_to_validate,1], color='blue', marker='o', label='Points')
+        # plt.xlim((0,1200))
+        # plt.plot()
+        # plt.show()
+
+        # if point_3d_prin.shape[0] > 0:
+        #     axis = np.linalg.inv(cur_pose) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+        #     plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'b-')
+        #     plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
+        #     for pose in pose_3d_prin:
+        #         ax = np.linalg.inv(pose) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+        #         plt.plot([ax[0,3],ax[0,0]],[ax[2,3], ax[2,0]], 'b-')
+        #         plt.plot([ax[0,3],ax[0,2]],[ax[2,3], ax[2,2]], 'g-')
+        #     plt.scatter(point_3d_prin[:,0],point_3d_prin[:,2], color='blue', marker='o')
+        #     plt.xlabel('X-axis')
+        #     plt.ylabel('Z-axis')
+        #     plt.title('augusto Visualization')
+        #     plt.legend() # Show legend
+        #     plt.show() # Show the plot
+        # if len(alphas) > 0:
+        #     print("alphas")
+        #     alphas_array = np.array(alphas)
+        #     print("alphas mean ",np.mean(alphas_array))
+        #     print("median ", np.median(alphas_array))
+        #     print("max value ", np.max(alphas_array))
+        #     print("------ ")
             
 
         # REMOVE THE VALIDATED KEYPOINTS FROM THE CANDIDATE LIST
@@ -671,6 +713,7 @@ class LandmarkTriangulator():
             print("---- SUM-UP STATE----")
             print(f"len_stateP_start: {len_stateP_start}")
             print(f"len_stateP_now: {len(state['P'])}")
+
 
 
         return (state, candidate_keypoints, cur_des)

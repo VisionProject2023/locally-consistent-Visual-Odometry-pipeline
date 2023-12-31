@@ -62,9 +62,11 @@ kps_1, kps_2 = VOInit.getKeypointMatches(img0, img1)
 print("len kps1", kps_1.shape)
 
 # estimate pose
-img1_img2_pose_tranform = VOInit.getPoseEstimate(kps_1, kps_2)
-
+img1_img2_pose_tranform, mask = VOInit.getPoseEstimate(kps_1, kps_2)
+mask = np.hstack(mask).astype(np.bool_)
 # triangulate landmarks
+kps_1 = kps_1[mask, :]
+kps_2 = kps_2[mask,:]
 state = VOInit.get_2D_3D_landmarks_association(kps_1, kps_2, img1_img2_pose_tranform)
 print(state.keys())
 print("len P ",state['P'].shape)
@@ -138,7 +140,7 @@ plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered
 plt.plot()
 plt.show()
 
-debug = True
+debug = False
 ### - Continuous Operation
 candidate_keypoints = {}
 candidate_keypoints['C'] = np.array([])
@@ -159,7 +161,9 @@ vision.candidate_keypoints = candidate_keypoints
 associate = KeypointsToLandmarksAssociator(K, T_hom)
 pose_estimator = PoseEstimator(K)
 
-for img_idx in range(3,40):
+
+axis_list = []
+for img_idx in range(3,700):
     print(f"\n\n\n\n---------- IMG {img_idx} ----------")
     # loading the next image
     if config['dataset'] == 'kitti':
@@ -188,9 +192,12 @@ for img_idx in range(3,40):
     print("T_world_new_frame")
     print(T_world_newframe)
     axis = np.linalg.inv(T_world_newframe) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+    pos_h = np.zeros(4)
+    pos_h[3] = 1
+    pos = (np.linalg.inv(T_world_newframe) @ pos_h)[0:3]
     X = vision.state['X']
-    filter = np.linalg.norm(X, axis = 1) < 20
-    filter_add = np.linalg.norm(X, axis = 1) > 3
+    filter = np.linalg.norm(X - pos, axis = 1) < 50
+    filter_add = np.linalg.norm(X - pos, axis = 1) > 3
     filter = filter * filter_add
     print("filter len ", filter.shape)
     print("X shape ", X.shape)
@@ -199,11 +206,14 @@ for img_idx in range(3,40):
 
     plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'b-')
     plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
+    for ax in axis_list:
+        plt.plot([ax[0,3],ax[0,0]],[ax[2,3], ax[2,0]], 'b-')
+        plt.plot([ax[0,3],ax[0,2]],[ax[2,3], ax[2,2]], 'r-')
+    axis_list.append(axis)
     plt.xlabel('X-axis')
     plt.ylabel('Z-axis')
-    plt.axis('square')
+    # plt.axis('square')
     plt.title('2D Points Visualization')
-    plt.show()
 
     landmark_triangulator = LandmarkTriangulator(K, old_des)
     new_state, candidate_keypoints, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, state_2, candidate_keypoints, new_candidates_list, T_world_newframe)
@@ -216,38 +226,38 @@ for img_idx in range(3,40):
     img1 = img2
     old_des = cur_des
     cur_pose = T_world_newframe
+plt.show()
     # if debug:
     #     print(f"vision.state: {vision.state}")
     #     print(f"vision.candidate_keypoints: {vision.candidate_keypoints}")
-
 # ***** DEBUG *****
 # plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
-print("dimensione ", img1_img2_pose_tranform.shape)
-T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
-t_inv = np.linalg.inv(T_hom)
-axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+# print("dimensione ", img1_img2_pose_tranform.shape)
+# T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
+# t_inv = np.linalg.inv(T_hom)
+# axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
-t_inv_2 = np.linalg.inv(T_world_newframe)
-axis_2 = t_inv_2 @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+# t_inv_2 = np.linalg.inv(T_world_newframe)
+# axis_2 = t_inv_2 @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
-filter = np.linalg.norm(X, axis = 1) < 10
-filter_add = np.linalg.norm(X, axis = 1) > 3
-filter = filter * filter_add
-print("filter len ", filter.shape)
-print("X shape ", X.shape)
-X_filtered = X[filter,:]
-plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
-plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
-plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
-plt.plot([axis_2[0,3],axis_2[0,0]],[axis_2[2,3], axis_2[2,0]], 'b-')
-plt.plot([axis_2[0,3],axis_2[0,2]],[axis_2[2,3], axis_2[2,2]], 'b-')
-plt.xlabel('X-axis')
-plt.ylabel('Z-axis')
-plt.ylim((0,10))
-plt.xlim((-5,5))
-plt.title('2D Points Visualization')
-plt.legend() # Show legend
-plt.show() # Show the plot
+# filter = np.linalg.norm(X, axis = 1) < 10
+# filter_add = np.linalg.norm(X, axis = 1) > 3
+# filter = filter * filter_add
+# print("filter len ", filter.shape)
+# print("X shape ", X.shape)
+# X_filtered = X[filter,:]
+# plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
+# plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
+# plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
+# plt.plot([axis_2[0,3],axis_2[0,0]],[axis_2[2,3], axis_2[2,0]], 'b-')
+# plt.plot([axis_2[0,3],axis_2[0,2]],[axis_2[2,3], axis_2[2,2]], 'b-')
+# plt.xlabel('X-axis')
+# plt.ylabel('Z-axis')
+# plt.ylim((0,10))
+# plt.xlim((-5,5))
+# plt.title('2D Points Visualization')
+# plt.legend() # Show legend
+# plt.show() # Show the plot
 #*****************
 
 #%%
