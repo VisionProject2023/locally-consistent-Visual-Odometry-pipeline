@@ -76,18 +76,20 @@ P = state['P']
 # plot the initialization images
 plt.figure(figsize=(10, 10))
 plt.imshow(img0, cmap='gray')
-plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20)
+plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20, label = 'keypoints')
 plt.xlabel('x (pixels)')
 plt.ylabel('y (pixels)')
-plt.title('Image 1')
+plt.title('Initialization Image 1 (frame %d)' % bootstrap_frames[0])
+plt.legend()
 plt.show()
 
 plt.figure(figsize=(10, 10))
 plt.imshow(img0, cmap='gray')
-plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20)
+plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20, label = 'keypoints')
 plt.xlabel('x (pixels)')
 plt.ylabel('y (pixels)')
-plt.title('Image 2')
+plt.title('Initialization Image 2 (frame %d)' % bootstrap_frames[1])
+plt.legend()
 plt.show()
 
 # 3D plot of the initialization 3D landmarks (X)
@@ -100,7 +102,7 @@ plt.show()
 # ax.set_title('3D landmarks (X)')
 # plt.show()
 
-# plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
+# plot a filtered version of the 3D landmarks (X)
 print("dimensione ", img1_img2_pose_tranform.shape)
 T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
 t_inv = np.linalg.inv(T_hom)
@@ -129,6 +131,7 @@ points = kps_1[filter, :]
 print("size filtered points ", points.shape)
 plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
 plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
+plt.title('filtered 2d keypoints image 1')
 plt.plot()
 plt.show()
 
@@ -137,10 +140,12 @@ plt.imshow(img1)
 points2 = kps_2[filter,:]
 plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
 plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
+plt.title('filtered 2d keypoints image 2')
 plt.plot()
 plt.show()
 
 debug = False
+
 ### - Continuous Operation
 candidate_keypoints = {}
 candidate_keypoints['C'] = np.array([])
@@ -148,7 +153,7 @@ candidate_keypoints['F'] = np.array([])
 candidate_keypoints['T'] = np.array([])
 
 sift = cv2.SIFT.create()
-_, old_des = sift.detectAndCompute(img1, None)
+_, old_des = sift.detectAndCompute(img1, None) # this should come from the initialization and we should start from img2
 
 cur_pose = img1_img2_pose_tranform
 print(f"img1_img2_pose_tranform: {img1_img2_pose_tranform}")
