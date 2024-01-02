@@ -104,7 +104,7 @@ plt.show()
 # ax.set_title('3D landmarks (X)')
 # plt.show()
 
-# plot a filtered version of the 3D landmarks (X)
+# triangulated 3D Points Visualization (z-axis) of the initialization
 print("dimensione ", img1_img2_pose_tranform.shape)
 T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
 t_inv = np.linalg.inv(T_hom)
@@ -116,6 +116,7 @@ filter = filter * filter_add
 print("filter len ", filter.shape)
 print("X shape ", X.shape)
 X_filtered = X[filter,:]
+
 plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
 plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
 plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
@@ -123,7 +124,7 @@ plt.xlabel('X-axis')
 plt.ylabel('Z-axis')
 plt.ylim((0,50))
 plt.xlim((-15,15))
-plt.title('2D Points Visualization')
+plt.title('triangulated 3D Points Visualization (z-axis) of the initialization')
 plt.legend() # Show legend
 plt.show() # Show the plot
 
@@ -157,15 +158,20 @@ candidate_keypoints['T'] = np.array([])
 sift = cv2.SIFT.create()
 _, old_des = sift.detectAndCompute(img1, None) # this should come from the initialization and we should start from img2
 
-cur_pose = img1_img2_pose_tranform
-print(f"img1_img2_pose_tranform: {img1_img2_pose_tranform}")
-print(f"img1_img2_pose_tranform.shape: {img1_img2_pose_tranform.shape}")
 
-vision = BestVision(K) #instantiate BestVision:
+#instantiate BestVision:
+vision = BestVision(K) 
 vision.state = state
 vision.candidate_keypoints = candidate_keypoints
+cur_pose = img1_img2_pose_tranform # cur_pose is the position of frame 2 now!
+if debug:
+    print(f"img1_img2_pose_tranform: {img1_img2_pose_tranform}")
+    print(f"img1_img2_pose_tranform.shape: {img1_img2_pose_tranform.shape}")
+    
 associate = KeypointsToLandmarksAssociator(K, T_hom)
 pose_estimator = PoseEstimator(K)
+
+
 
 
 axis_list = []
@@ -186,22 +192,24 @@ for img_idx in range(3,700):
 
     # instantiate Landmark association
 
-    state_2, new_candidates_list = associate.associateKeypoints(img1,img2, vision.state)
+    new_state, new_candidates_list = associate.associateKeypoints(img1, img2, vision.state)
     if debug:
         print(f"new_candidates_list: {new_candidates_list}")
-        print(f"len(state_2['P']): {len(state_2['P'])}")
+        print(f"len(state_2['P']): {len(new_state['P'])}")
 
-    # estimate the pose of the new frame
-    T_world_newframe = pose_estimator.estimatePose(state_2)
+    # estimate the pose of the new frame and update 
+    new_pose = pose_estimator.estimatePose(new_state) # T_world_newframe
     if debug:
-        print(f"T_world_newframe: {T_world_newframe}")
-    associate.update_pose(T_world_newframe)
-    print("T_world_new_frame")
-    print(T_world_newframe)
-    axis = np.linalg.inv(T_world_newframe) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+        print(f"new_pose (T_world_newframe): {new_pose}")
+        
+    # maybe save the pose in an array (to plot later)
+    # associate.update_pose(T_world_newframe)
+    
+    # plotting functionality (3D landmarks)
+    axis = np.linalg.inv(new_pose) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
     pos_h = np.zeros(4)
     pos_h[3] = 1
-    pos = (np.linalg.inv(T_world_newframe) @ pos_h)[0:3]
+    pos = (np.linalg.inv(new_pose) @ pos_h)[0:3]
     X = vision.state['X']
     filter = np.linalg.norm(X - pos, axis = 1) < 50
     filter_add = np.linalg.norm(X - pos, axis = 1) > 3
@@ -222,19 +230,21 @@ for img_idx in range(3,700):
     # plt.axis('square')
     plt.title('2D Points Visualization')
 
+    # Add new landmark triangulations to the state
     landmark_triangulator = LandmarkTriangulator(K, old_des)
-    new_state, candidate_keypoints, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, state_2, candidate_keypoints, new_candidates_list, T_world_newframe)
+    new_state, candidate_keypoints, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, new_state, candidate_keypoints, new_candidates_list, new_pose)
     
     # if debug:
     #     print(f"new_state: {new_state}")
     #     print(f"candidate_keypoints: {candidate_keypoints}")
 
+    # update the state
     vision.state = new_state
     vision.candidate_keypoints = candidate_keypoints
     img1 = img2
     old_des = cur_des
-    cur_pose = T_world_newframe
 plt.show()
+
     # if debug:
     #     print(f"vision.state: {vision.state}")
     #     print(f"vision.candidate_keypoints: {vision.candidate_keypoints}")

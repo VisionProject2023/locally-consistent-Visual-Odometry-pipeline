@@ -220,7 +220,7 @@ class VOInitializer():
         state['P'] = kps_1      
         # -> feature to work on!
         
-        return state
+        return state  #future improvement: try out .astype(np.float32)
 
 
 class KeypointsToLandmarksAssociator():
@@ -242,31 +242,44 @@ class KeypointsToLandmarksAssociator():
         Inputs:
             old_frame: HxW np.ndarray
             new_frame: HxW np.ndarray
-            state: dict with keys 'P' and 'X'
-            features: list of 2D points corresponding to features detected in the new image
+            state: dict with keys 'P' (keypoints) and 'X' (3D landmarks)
 
         Outputs:
             associations: dictinary with keys 'P' and 'i'. associations['P'] contains 2D points from new_frame associated with previous landmarks
                           and associations['i'] contains list of indices to which the points are associated
+        
+        function to use cv2.calcOpticalFlowPyrLK()
+        input: 
+              prevImage
+              nextImage
+              prevPts -> vector of 2d points to track
+              
+        Output:
+              nextPts -> vector of 2D points containing the calculated new 
+                         positions of input features in the second image
+              status -> vector with 1 if corresponding feature has been found, 0 if not
+              error -> output vector of errors
         '''
-        #function to use cv2.calcOpticalFlowPyrLK()
-        #input: 
-        #       prevImage
-        #       nextImage
-        #       prevPts -> vector of 2d points to track
-        #Output:
-        #       nextPts -> vector of 2D points containing the calculated new 
-        #                  positions of input features in the second image
-        #       status -> vector with 1 if corresponding feature has been found, 0 if not
-        #       error -> output vector of errors
+        
         state['P'] = state['P'].astype(np.float32)
-        next_points, status, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, state['P'], None)
-        filter_status = np.hstack(status).astype(np.bool_)
-        filter_for_august = np.logical_not(filter_status)
-        next_point_for_august = next_points[filter_for_august]
-        state_p_found = state['P'][filter_status]
-        next_points = next_points[filter_status]
-   
+        keypoints, status, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, state['P'], None)
+        filter_well_tracked = np.hstack(status).astype(np.bool_)
+        
+        filter_tracking_lost = np.logical_not(filter_well_tracked)
+        points_tracking_lost = keypoints[filter_tracking_lost]
+        
+        # tracked keypoints
+        keypoints_well_tracked = keypoints[filter_well_tracked]
+        
+        # associate the tracked keypoint to the same 3D landmark
+        landmarks_corresponding = state['X'][filter_well_tracked]
+        
+        # define the new state
+        new_state = {'P': keypoints_well_tracked, 'X': landmarks_corresponding}
+        
+        return (new_state, points_tracking_lost)
+    
+        ### The comments below were part of the associateKeypoints method
         #remove outliers
         #we are seeing a car like vehichle, so we can exploit the 1 point ransac:
         # I imagine a 2 x N array
@@ -316,7 +329,7 @@ class KeypointsToLandmarksAssociator():
         # plt.legend() # Show legend
         # plt.show() # Show the plot
 
-        state_found_x = state['X'][filter_status]
+
         # #I obtain a matrix from origin coordinates to current pose coordinate
         # proj_points, jacob = cv2.projectPoints(state_found_x, hom_inv[0:3,0:3], hom_inv[0:3,3], self.K, None)
         # proj_points = np.reshape(proj_points, (proj_points.shape[0], proj_points.shape[-1]))
@@ -346,8 +359,7 @@ class KeypointsToLandmarksAssociator():
         # print("len P no error ", new_P_error_free.shape)
         #new_state = {'P': new_P_error_free, 'X': next_points[filter3]}
         # new_state = {'P': next_points[filter3], 'X': state_found_x[filter3]}
-        new_state = {'P': next_points, 'X': state_found_x}
-        return (new_state, next_point_for_august)
+        
     
     def update_pose(self, pose:np.ndarray):
         self.current_pose = pose
@@ -407,11 +419,14 @@ class LandmarkTriangulator():
 
         pass
 
-    def find_new_candidates(self, old_frame: np.ndarray, cur_frame: np.ndarray, state:dict, candidate_keypoints: dict) -> list:
+    def find_new_candidates(self, old_frame: np.ndarray, new_frame: np.ndarray, state:dict, candidate_keypoints: dict) -> list:
+        # we should try a KLT implementation for this!
         
         debug = False
+        
+        # detect new keypoints in the current frame (the one where to find new candidates)
         sift = cv2.SIFT.create()
-        keypoints, cur_des = sift.detectAndCompute(cur_frame, None)
+        keypoints, cur_des = sift.detectAndCompute(new_frame, None) 
 
         bf = cv2.BFMatcher.create(cv2.NORM_L2, crossCheck=False) # crossCheck=True is an alternative to the ratiotest (proposed by D. Lowe in SIFT paper)	
         kp_matches = bf.knnMatch(self.old_des, cur_des, k=2) # k=2: return the two best matches for each descriptor
@@ -422,10 +437,10 @@ class LandmarkTriangulator():
             if m.distance < 0.8*n.distance: # "distance" = distance function = how similar are the descriptors
                 good_kp_matches.append(m)
 
+        # new_keypoints -> the good matches that didn't appear in the previous (old) image
         old_keypoints = np.array([keypoints[match.trainIdx].pt for match in good_kp_matches])
         keypoints = np.array([kp.pt for kp in keypoints])
         mask = np.isin(keypoints, old_keypoints, invert=True).all(axis=1)
-        
         new_keypoints = keypoints[mask]
         
         # # divide the keypoints into new ones and already existing ones
@@ -444,10 +459,16 @@ class LandmarkTriangulator():
             print(f"new_kp: {new_keypoints}")
 
         return (new_keypoints, cur_des)
+    
+    # def find_new_candidates_KLT(self, old_frame: np.ndarray, new_frame: np.ndarray, state:dict, candidate_keypoints: dict) -> list:
+    #     # we should try a KLT implementation for this!
+        
+
+    #     return (new_keypoints, cur_des)
 
 
 
-    def triangulate_landmark(self, old_frame: np.ndarray, cur_frame: np.ndarray, state:dict, candidate_keypoints: dict, new_candidates_list, cur_pose) -> dict:
+    def triangulate_landmark(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict, candidate_keypoints: dict, new_candidates_list, new_pose) -> dict:
         '''
         Inputs:
             candidate_keypoints: dict as defined in the main class
@@ -458,12 +479,15 @@ class LandmarkTriangulator():
             new_landmarks: dictionary with keys 'P' and 'X'  for the new identified landmarks
         '''
 
-        # TELL NICOLA TO PASS ME cur_pose !!!
+        # idea: add an if statement that the sift descriptor matching approach will be executed when the optical flow fails
+
+        
+        # TELL NICOLA TO PASS ME new_pose !!!
         # ATTENTION: construct candidate_keypoints['T'] as a three-dimensional vector (K,4,4) !!!
 
-        # new_candidates_list are the new keypoints identified by Ricky in the cur_frame and NOT present in the previous frames
+        # new_candidates_list are the new keypoints identified by Ricky in the new_frame and NOT present in the previous frames
         # => EXPLAIN TO RICKY HOW TO PASS THEM: I would say he can simply pass a list of these new_candidates
-        # that he finds by taking the keypoints of cur_frame that have no correspondence in the prec_frame
+        # that he finds by taking the keypoints of new_frame that have no correspondence in the prec_frame
         # ATTENTION: every time all the keyframes that have not yet been
         # validated are inserted in new_candidates, then I proceed to evaluate if they are actually new or if they had already been identified but NOT YET
         # validated
@@ -487,7 +511,7 @@ class LandmarkTriangulator():
             print(f"len(candidate_keypoints['T']) iniziale: {len(candidate_keypoints['T'])}")
 
         if len(p0)>0:
-            p1, st, err = cv2.calcOpticalFlowPyrLK(old_frame, cur_frame, p0, None)
+            p1, st, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, p0, None)
             st = np.hstack(st).astype(np.bool_)
             if p1 is not None:
                 good_new = p1[st==1]
@@ -547,14 +571,14 @@ class LandmarkTriangulator():
 
 
         # ADD NEW CANDIDATE KEYPOINTS THAT HAVE NEWLY BEEN TRACKED
-        new_candidates_list, cur_des = self.find_new_candidates(old_frame, cur_frame, state, candidate_keypoints)
+        new_candidates_list, cur_des = self.find_new_candidates(old_frame, new_frame, state, candidate_keypoints)
         if debug:
             print(f"new candidates list: {new_candidates_list}")
         if len(new_candidates_list) > 0:
             new_candidates = {}
             new_candidates['C'] = new_candidates_list
             new_candidates['F'] = new_candidates_list
-            new_candidates['T'] = np.stack([(np.eye(4) @ cur_pose) for _ in range(len(new_candidates_list))])
+            new_candidates['T'] = np.stack([(np.eye(4) @ new_pose) for _ in range(len(new_candidates_list))])
 
             if len(candidate_keypoints['C']) == 0:
                 candidate_keypoints['C'] = new_candidates['C']
@@ -633,7 +657,7 @@ class LandmarkTriangulator():
             # print(f"point2: {point2}")
             pose_3d_prin.append(candidate_keypoints['T'][idx])
             # Triangulate the validated keypoint
-            point_3d_hom = cv2.triangulatePoints(self.K @ candidate_keypoints['T'][idx][0:3,:], self.K @ cur_pose[0:3,:], candidate_keypoints['F'][idx].T,  candidate_keypoints['C'][idx].T)
+            point_3d_hom = cv2.triangulatePoints(self.K @ candidate_keypoints['T'][idx][0:3,:], self.K @ new_pose[0:3,:], candidate_keypoints['F'][idx].T,  candidate_keypoints['C'][idx].T)
             # Convert homogeneous coordinates to 3D coordinates
             #point_3d = cv2.convertPointsFromHomogeneous(point_3d_hom.T).reshape(-1, 3)
             point_3d = (point_3d_hom[0:3].T / point_3d_hom[3].T).T
@@ -655,14 +679,14 @@ class LandmarkTriangulator():
         # print("poin 3d prin")
         # print(point_3d_prin.shape)
         # print("drawing ......")
-        # plt.imshow(cur_frame)
+        # plt.imshow(new_frame)
         # plt.scatter(candidate_keypoints['C'][indices_to_validate,0],candidate_keypoints['C'][indices_to_validate,1], color='blue', marker='o', label='Points')
         # plt.xlim((0,1200))
         # plt.plot()
         # plt.show()
 
         # if point_3d_prin.shape[0] > 0:
-        #     axis = np.linalg.inv(cur_pose) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
+        #     axis = np.linalg.inv(new_pose) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
         #     plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'b-')
         #     plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
         #     for pose in pose_3d_prin:
