@@ -1,10 +1,12 @@
-# %%
+#%%
 
 import os
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from vo_pipeline import *
+
+debug = config['debug']
 
 # Setup
 if config['dataset'] == 'kitti':
@@ -159,8 +161,7 @@ cur_pose = img1_img2_pose_tranform
 print(f"img1_img2_pose_tranform: {img1_img2_pose_tranform}")
 print(f"img1_img2_pose_tranform.shape: {img1_img2_pose_tranform.shape}")
 
-#instantiate BestVision:
-vision = BestVision(K)
+vision = BestVision(K) #instantiate BestVision:
 vision.state = state
 vision.candidate_keypoints = candidate_keypoints
 associate = KeypointsToLandmarksAssociator(K, T_hom)
@@ -190,6 +191,7 @@ for img_idx in range(3,700):
         print(f"new_candidates_list: {new_candidates_list}")
         print(f"len(state_2['P']): {len(state_2['P'])}")
 
+    # estimate the pose of the new frame
     T_world_newframe = pose_estimator.estimatePose(state_2)
     if debug:
         print(f"T_world_newframe: {T_world_newframe}")
@@ -222,6 +224,7 @@ for img_idx in range(3,700):
 
     landmark_triangulator = LandmarkTriangulator(K, old_des)
     new_state, candidate_keypoints, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, state_2, candidate_keypoints, new_candidates_list, T_world_newframe)
+    
     # if debug:
     #     print(f"new_state: {new_state}")
     #     print(f"candidate_keypoints: {candidate_keypoints}")
