@@ -1,4 +1,4 @@
-# %%
+#%%
 
 import os
 import numpy as np
@@ -11,7 +11,7 @@ debug = config['debug']
 # Setup
 if config['dataset'] == 'kitti':
     # Set kitti_path to the folder containing "05" and "poses"
-    kitti_path = 'kitti'  # replace with your path
+    kitti_path = '../kitti'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
     last_frame = 4540
@@ -79,7 +79,7 @@ plt.imshow(img0, cmap='gray')
 plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20)
 plt.xlabel('x (pixels)')
 plt.ylabel('y (pixels)')
-plt.title('Image 1')
+plt.title('Initialization Image 1 (frame:%{bootstrap_frames[0]}})')
 plt.show()
 
 plt.figure(figsize=(10, 10))
@@ -87,7 +87,7 @@ plt.imshow(img0, cmap='gray')
 plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20)
 plt.xlabel('x (pixels)')
 plt.ylabel('y (pixels)')
-plt.title('Image 2')
+plt.title('Initialization Image 2 (frame:%{bootstrap_frames[1]}})')
 plt.show()
 
 # 3D plot of the initialization 3D landmarks (X)
@@ -123,22 +123,22 @@ plt.title('2D Points Visualization')
 plt.legend() # Show legend
 plt.show() # Show the plot
 
-# plot all and filtered 2D keypoints (img 1)
-plt.imshow(img1)
-points = kps_1[filter, :]
-print("size filtered points ", points.shape)
-plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
-plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
-plt.plot()
-plt.show()
+# # plot all and filtered 2D keypoints (img 1)
+# plt.imshow(img1)
+# points = kps_1[filter, :]
+# print("size filtered points ", points.shape)
+# plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
+# plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
+# plt.plot()
+# plt.show()
 
-# plot all and filtered 2D keypoints (img 2)
-plt.imshow(img1)
-points2 = kps_2[filter,:]
-plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
-plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
-plt.plot()
-plt.show()
+# # plot all and filtered 2D keypoints (img 2)
+# plt.imshow(img1)
+# points2 = kps_2[filter,:]
+# plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
+# plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
+# plt.plot()
+# plt.show()
 
 
 ### - Continuous Operation
