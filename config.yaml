@@ -6,7 +6,9 @@ dataset: 'kitti' # kitti, malaga or parking
 init_detector_descriptor: 'sift'
 
 # debug
-debug: True
+debug: False
 
+# visualization
+visualization: True
 
 

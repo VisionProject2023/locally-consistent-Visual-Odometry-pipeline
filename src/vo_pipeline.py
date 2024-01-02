@@ -28,7 +28,7 @@ class BestVision():
         '''
         This method builds the object and creates the attributes we are going to use. In particular we store the last image received and a state dictionary which contains
         information about the 3D landmarks that we identified in the previous step (the state refers only to the previous step since the 
-        pipeline has to be markovian). We also store the candidate_keypoints that will be used in order to generate new 3D landmarks whenever possible.
+        pipeline has to be markovian). We also store the extended_state that will be used in order to generate new 3D landmarks whenever possible.
         
         Inputs:
             K: 3x3 np.ndarray of intrinsic parameters
@@ -40,7 +40,7 @@ class BestVision():
         
         self.previous_image = np.ndarray
         self.state = {'P': np.ndarray, 'X': np.ndarray} # 'P' (keypoints), 'X' (3D landmarks)
-        self.candidate_keypoints = {'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
+        self.extended_state = {'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
     def initialize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
         '''
@@ -54,8 +54,7 @@ class BestVision():
         Outputs:
             T: 4x4 np.ndarray representing pose (T = [R|t]])
             S: dictionary with keypoints 'P' (keys) and 3D landmarks 'X' (values) 
-        '''
-        
+        ''' 
     
         pass
     
@@ -235,9 +234,9 @@ class KeypointsToLandmarksAssociator():
         # current_pose is a Homo matrix that performs a change of basis from the first 
         # camera's coordinate system to the second camera's coordinate system
 
-    def associateKeypoints(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict) -> dict:
+    def associateKeypointsToLandmarks(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict) -> dict:
         '''
-        Associate keypoints from old image to features of the new image.
+        Associates keypoints from old image to features of the new image with the KLT algorithm
 
         Inputs:
             old_frame: HxW np.ndarray
@@ -279,7 +278,7 @@ class KeypointsToLandmarksAssociator():
         
         return (new_state, points_tracking_lost)
     
-        ### The comments below were part of the associateKeypoints method
+        ### The comments below were part of the associateKeypointsToLandmarks method
         #remove outliers
         #we are seeing a car like vehichle, so we can exploit the 1 point ransac:
         # I imagine a 2 x N array
@@ -361,8 +360,8 @@ class KeypointsToLandmarksAssociator():
         # new_state = {'P': next_points[filter3], 'X': state_found_x[filter3]}
         
     
-    def update_pose(self, pose:np.ndarray):
-        self.current_pose = pose
+    # def update_pose(self, pose:np.ndarray):
+    #     self.current_pose = pose
 
 class PoseEstimator():
     def __init__(self, K):
@@ -372,8 +371,8 @@ class PoseEstimator():
         self.K = K
 
         """ Constants """
-        self.REPOJ_THRESH = 2      # threshold on the reprojection error of points accepted as inliers
-        self.CONFIDENCE = 0.9999   # dsired confidence of result
+        self.REPOJ_THRESH = 2     # was 2, threshold on the reprojection error of points accepted as inliers
+        self.CONFIDENCE = 0.99999   # dsired confidence of result
     
     def estimatePose(self, associations: Dict[np.ndarray,np.ndarray]) -> np.ndarray:
         '''
@@ -399,13 +398,21 @@ class PoseEstimator():
         R, _ = cv2.Rodrigues(R_vec)
         print("real angle ", np.arccos(R[0,0]) * 180 / np.pi)
         # add nonlinear refinement with --> solvePnPRefineLM
-        inliers = np.hstack(inliers)
-        print(inliers[0:10])
-        print("shape pre modifia ", associations['X'].shape)
-        associations['P'] = associations['P'][inliers,:]
-        associations['X'] = associations['X'][inliers,:]
-        print("shape pos modifia ", associations['X'].shape)
-        T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([[0,0,0,1]])], axis=0)
+        if inliers is not None:
+            if len(inliers) < 4:
+                print('less than 4 inliers! len(inliers) = ', len(inliers))
+            inliers = np.hstack(inliers)
+            print(inliers[0:10])
+            print("shape pre modifia ", associations['X'].shape)
+            associations['P'] = associations['P'][inliers,:]
+            associations['X'] = associations['X'][inliers,:]
+            print("shape pos modifia ", associations['X'].shape)
+            T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([[0,0,0,1]])], axis=0)
+        
+        
+        if inliers is None:
+            print('Error: no inliers found! T can not be calculated')
+        
         return T
 
 
@@ -419,7 +426,7 @@ class LandmarkTriangulator():
 
         pass
 
-    def find_new_candidates(self, old_frame: np.ndarray, new_frame: np.ndarray, state:dict, candidate_keypoints: dict) -> list:
+    def find_new_candidates(self, new_frame: np.ndarray, state: dict, extended_state: dict) -> list:
         # we should try a KLT implementation for this!
         
         debug = False
@@ -444,8 +451,8 @@ class LandmarkTriangulator():
         new_keypoints = keypoints[mask]
         
         # # divide the keypoints into new ones and already existing ones
-        # if len(candidate_keypoints['C']) > 0:
-        #     known_points = np.concatenate((state['P'], candidate_keypoints['C']), axis=0)
+        # if len(extended_state['C']) > 0:
+        #     known_points = np.concatenate((state['P'], extended_state['C']), axis=0)
         # else:
         #     known_points = state['P']
 
@@ -460,18 +467,37 @@ class LandmarkTriangulator():
 
         return (new_keypoints, cur_des)
     
-    # def find_new_candidates_KLT(self, old_frame: np.ndarray, new_frame: np.ndarray, state:dict, candidate_keypoints: dict) -> list:
-    #     # we should try a KLT implementation for this!
+    def find_new_candidates_2(self, new_frame: np.ndarray, state: dict, extended_state: dict, keypoints_well_tracked) -> list: 
+    
+        # Shi-Tomashi corner detector, to test and figure out (will probably have to change the type of kps_f1 to cv.KeyPoint)
+        new_keypoints = cv2.goodFeaturesToTrack(new_frame, maxCorners=100, qualityLevel=0.02, minDistance=10, mask=None, blockSize=4, gradientSize=3, useHarrisDetector=False, k=0.04)
         
+        # remove one dimension
+        new_keypoints = np.squeeze(new_keypoints)
+        
+        # Convert keypoints to cv2.KeyPoint format
+        #new_keypoints = [cv2.KeyPoint(x=pt[0][0], y=pt[0][1], size=20) for pt in new_keypoints]
+    
+        for keypoint_well_tracked in keypoints_well_tracked:
+            # check how close the new keypoints are to the old ones (distance < 2)
+            distance = [np.sqrt((keypoint_well_tracked[0] - new_keypoints[i][0])**2 + ((keypoint_well_tracked[1] - new_keypoints[i][1]))**2) < 2 for i in range(len(new_keypoints))]
+            # remove the keypoints that are too close to the old ones
+            new_keypoints = [new_keypoints[i] for i in range(len(new_keypoints)) if distance[i] == True]
+            
+        #kps_f1_KLT = cv2.KeyPoint_convert(kps_f1) # Convert to Point2f format for KLT tracker
+        
+    
+        return new_keypoints
 
-    #     return (new_keypoints, cur_des)
 
-
-
-    def triangulate_landmark(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict, candidate_keypoints: dict, new_candidates_list, new_pose) -> dict:
+    def triangulate_landmark(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict, extended_state: dict, new_pose) -> dict:
         '''
+        
+        Candidate keypoints is only for the triangulation of new landmarks
+        We have to determine at which keyframe (or for which keypoint pairs) we do triangulation!
+        
         Inputs:
-            candidate_keypoints: dict as defined in the main class
+            extended_state: dict as defined in the main class
             frame: HxW np.ndarray
             features: 2xN np.ndarray containing 2D points detected in the last frame
 
@@ -482,12 +508,17 @@ class LandmarkTriangulator():
         # idea: add an if statement that the sift descriptor matching approach will be executed when the optical flow fails
 
         
-        # TELL NICOLA TO PASS ME new_pose !!!
-        # ATTENTION: construct candidate_keypoints['T'] as a three-dimensional vector (K,4,4) !!!
+        # ATTENTION: construct extended_state['T'] as a three-dimensional vector (K,4,4) !!!
 
-        # new_candidates_list are the new keypoints identified by Ricky in the new_frame and NOT present in the previous frames
+        
+        # keypoints_tracking_lost are the keypoints in the previous image that could not be tracked to the new image during KLT
+        
+        # (new_candidates_list are the new keypoints identified by Ricky in the new_frame and NOT present in the previous frames_
         # => EXPLAIN TO RICKY HOW TO PASS THEM: I would say he can simply pass a list of these new_candidates
         # that he finds by taking the keypoints of new_frame that have no correspondence in the prec_frame
+        
+        # the keypoints of the second frame have to be determined
+        
         # ATTENTION: every time all the keyframes that have not yet been
         # validated are inserted in new_candidates, then I proceed to evaluate if they are actually new or if they had already been identified but NOT YET
         # validated
@@ -499,127 +530,127 @@ class LandmarkTriangulator():
         debug2 = False
         print("\n\n---------- TRIANGULATE LANDMARK ----------")
 
-        # TRACK CANDIDATE KEYPOINTS
-        p0 = candidate_keypoints['C'].astype(np.float32)
-        len_ckC_step1 = len(candidate_keypoints['C'])
+        # 1) Track and update the existing candidate keypoints (from frame to frame)
+        candidate_keypoints_1 = extended_state['C'].astype(np.float32)
+        len_candidate_keypoints_1 = len(extended_state['C'])
         len_stateP_start = len(state['P'])
         if debug:
-            print(f"p0: {p0}")
-            print(f"len(p0): {len(p0)}")
-            print(f"len(candidate_keypoints['C']) iniziale: {len(candidate_keypoints['C'])}")
-            print(f"len(candidate_keypoints['F']) iniziale: {len(candidate_keypoints['F'])}")
-            print(f"len(candidate_keypoints['T']) iniziale: {len(candidate_keypoints['T'])}")
+            print(f"candidate_keypoints_1: {candidate_keypoints_1}")
+            print(f"len(candidate_keypoints_1): {len(candidate_keypoints_1)}")
+            print(f"len(extended_state['C']) iniziale: {len(extended_state['C'])}")
+            print(f"len(extended_state['F']) iniziale: {len(extended_state['F'])}")
+            print(f"len(extended_state['T']) iniziale: {len(extended_state['T'])}")
 
-        if len(p0)>0:
-            p1, st, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, p0, None)
+        if len(candidate_keypoints_1)>0:
+
+            candidate_keypoints_2, st, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, candidate_keypoints_1, None)
             st = np.hstack(st).astype(np.bool_)
-            if p1 is not None:
-                good_new = p1[st==1]
-                good_old = p0[st==1]
-            if len(good_old) != len(good_new):
-                print(f"ERRORE: good_old e good_new NON hanno la stessa lunghezza. len(good_old)={len(good_old)}!={len(good_new)}=len(good_new)")
-
+            if candidate_keypoints_2 is not None:
+                candidate_keypoints_2_well_tracked = candidate_keypoints_2[st==1]
+                candidate_keypoints_1_well_tracked = candidate_keypoints_1[st==1]
+                candidate_keypoints_1_tracking_lost = candidate_keypoints_1[st==0]
+                
+            if len(candidate_keypoints_1_well_tracked) != len(candidate_keypoints_2_well_tracked):
+                print(f"ERROR: candidate_keypoints_1_well_tracked and candidate_keypoints_2_well_tracked do not have the same length. len(candidate_keypoints_1_well_tracked)={len(candidate_keypoints_1_well_tracked)}!={len(candidate_keypoints_2_well_tracked)}=len(candidate_keypoints_2_well_tracked)")
             if debug:
                 print("\n---- TRACK CANDIDATE KEYPOINTS ----")
-                print(f"p1: {p1}")
-                print(f"good_new: {good_new}")
-                print(f"good_old: {good_old}")
+                print(f"candidate_keypoints_2: {candidate_keypoints_2}")
+                print(f"candidate_keypoints_2_well_tracked: {candidate_keypoints_2_well_tracked}")
+                print(f"candidate_keypoints_1_well_tracked: {candidate_keypoints_1_well_tracked}")
 
-            # REMOVE CANDIDATE KEYPOINTS THAT HAVE NOT BEEN RETRACKED
-            bad_old = p0[st==0]
-            # Create a boolean mask to identify the positions of candidate keypoints that have not been retracked
-            mask = np.isin(candidate_keypoints['C'], bad_old).all(axis=1)
+            # Create a boolean mask to identify the positions of the tracked candidate keypoints to be updated
+            mask = np.isin(extended_state['C'], candidate_keypoints_1_well_tracked).all(axis=1)
+            extended_state['C'][mask] = candidate_keypoints_2_well_tracked # Update all the candidate keypoints that have been retracked
+
+            len_ckC_step3 = len(extended_state['C'])
+            if debug:
+                print("\n---- UPDATE C OF CANDIDATE POINTS THAT HAVE BEEN RETRACKED ----")
+                print(f"mask: {mask}")
+                print(f"extended_state['C'][mask]: {extended_state['C'][mask]}")
+                print(f"extended_state['C']: {extended_state['C']}")
+                print(f"len(extended_state['C']) dopo update retracked: {len(extended_state['C'])}")
+                print(f"len(extended_state['F']) dopo update retracked: {len(extended_state['F'])}")
+                print(f"len(extended_state['T']) dopo update retracked: {len(extended_state['T'])}")
+
+            # Delete candidate keypoints that failed to track
+            mask = np.isin(extended_state['C'], candidate_keypoints_1_tracking_lost).all(axis=1)
             # Get the indices of elements to be removed
             indices_to_remove = np.where(mask)[0]
             # Check if any elements are found before attempting removal
             if len(indices_to_remove) > 0:
                 # Proceed to remove them
-                candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_remove, axis=0)
-                candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_remove, axis=0)
-                candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_remove, axis=0)
+                extended_state['C'] = np.delete(extended_state['C'], indices_to_remove, axis=0)
+                extended_state['F'] = np.delete(extended_state['F'], indices_to_remove, axis=0)
+                extended_state['T'] = np.delete(extended_state['T'], indices_to_remove, axis=0)
 
-            len_ckC_step2 = len(candidate_keypoints['C'])
+            len_candidate_keypoints_2 = len(extended_state['C'])
             if debug:
                 print("\n---- REMOVE CANDIDATE KEYPOINTS THAT HAVE NOT BEEN RETRACKED ----")
-                print(f"bad_old: {bad_old}")
+                print(f"candidate_keypoints_1_tracking_lost: {candidate_keypoints_1_tracking_lost}")
                 print(f"mask: {mask}")
                 print(f"indices_to_remove: {indices_to_remove}")
-                print(f"candidate_keypoints['C']: {candidate_keypoints['C']}")
-                print(f"candidate_keypoints['F']: {candidate_keypoints['F']}")
-                print(f"candidate_keypoints['T']: {candidate_keypoints['T']}")
-                print(f"len(candidate_keypoints['C']) iniziale: {len_ckC_step1}")
-                print(f"len(candidate_keypoints['C']) dopo rimozione untracked: {len(candidate_keypoints['C'])}")
-                print(f"len(candidate_keypoints['F']) dopo rimozione untracked: {len(candidate_keypoints['F'])}")
-                print(f"len(candidate_keypoints['T']) dopo rimozione untracked: {len(candidate_keypoints['T'])}")
+                print(f"extended_state['C']: {extended_state['C']}")
+                print(f"extended_state['F']: {extended_state['F']}")
+                print(f"extended_state['T']: {extended_state['T']}")
+                print(f"len(extended_state['C']) iniziale: {len_candidate_keypoints_1}")
+                print(f"len(extended_state['C']) dopo rimozione untracked: {len(extended_state['C'])}")
+                print(f"len(extended_state['F']) dopo rimozione untracked: {len(extended_state['F'])}")
+                print(f"len(extended_state['T']) dopo rimozione untracked: {len(extended_state['T'])}")
+                
+        if len(candidate_keypoints_1)==0:
+            candidate_keypoints_2_well_tracked = []
 
-
-            # UPDATE C OF CANDIDATE POINTS THAT HAVE BEEN RETRACKED
-            # Create a boolean mask to identify the positions of the tracked candidate keypoints to be updated
-            mask = np.isin(candidate_keypoints['C'], good_old).all(axis=1)
-            # Update all the candidate keypoints that have been retracked
-            candidate_keypoints['C'][mask] = good_new
-
-            len_ckC_step3 = len(candidate_keypoints['C'])
-            if debug:
-                print("\n---- UPDATE C OF CANDIDATE POINTS THAT HAVE BEEN RETRACKED ----")
-                print(f"mask: {mask}")
-                print(f"candidate_keypoints['C'][mask]: {candidate_keypoints['C'][mask]}")
-                print(f"candidate_keypoints['C']: {candidate_keypoints['C']}")
-                print(f"len(candidate_keypoints['C']) dopo update retracked: {len(candidate_keypoints['C'])}")
-                print(f"len(candidate_keypoints['F']) dopo update retracked: {len(candidate_keypoints['F'])}")
-                print(f"len(candidate_keypoints['T']) dopo update retracked: {len(candidate_keypoints['T'])}")
-
-
-        # ADD NEW CANDIDATE KEYPOINTS THAT HAVE NEWLY BEEN TRACKED
-        new_candidates_list, cur_des = self.find_new_candidates(old_frame, new_frame, state, candidate_keypoints)
+        # 2) Add new candidate keypoints
+        new_candidates_list, cur_des = self.find_new_candidates(new_frame, state, extended_state) #, candidate_keypoints_2_well_tracked)
         if debug:
             print(f"new candidates list: {new_candidates_list}")
+            
         if len(new_candidates_list) > 0:
             new_candidates = {}
             new_candidates['C'] = new_candidates_list
             new_candidates['F'] = new_candidates_list
             new_candidates['T'] = np.stack([(np.eye(4) @ new_pose) for _ in range(len(new_candidates_list))])
 
-            if len(candidate_keypoints['C']) == 0:
-                candidate_keypoints['C'] = new_candidates['C']
-                candidate_keypoints['F'] = new_candidates['F']
-                candidate_keypoints['T'] = new_candidates['T']
+            if len(extended_state['C']) == 0:
+                extended_state['C'] = new_candidates['C']
+                extended_state['F'] = new_candidates['F']
+                extended_state['T'] = new_candidates['T']
             else:
-                candidate_keypoints['C'] = np.concatenate((candidate_keypoints['C'], new_candidates['C']), axis=0)
-                candidate_keypoints['F'] = np.concatenate((candidate_keypoints['F'], new_candidates['F']), axis=0)
-                candidate_keypoints['T'] = np.concatenate((candidate_keypoints['T'], new_candidates['T']), axis=0) 
+                extended_state['C'] = np.concatenate((extended_state['C'], new_candidates['C']), axis=0)
+                extended_state['F'] = np.concatenate((extended_state['F'], new_candidates['F']), axis=0)
+                extended_state['T'] = np.concatenate((extended_state['T'], new_candidates['T']), axis=0) 
 
-            len_ckC_step4 = len(candidate_keypoints['C'])
+            len_ckC_step4 = len(extended_state['C'])
             if debug:
                 print("\n---- ADD NEW CANDIDATE KEYPOINTS THAT HAVE NEWLY BEEN TRACKED ----")
                 print(f"new_candidates['C']: {new_candidates['C']}")
                 print(f"new_candidates['F']: {new_candidates['F']}")
                 print(f"new_candidates['T']: {new_candidates['T']}")
-                print(f"candidate_keypoints['C']: {candidate_keypoints['C']}")
-                print(f"candidate_keypoints['F']: {candidate_keypoints['F']}")
-                print(f"candidate_keypoints['T']: {candidate_keypoints['T']}")
-                print(f"len(candidate_keypoints['C']) dopo add new: {len(candidate_keypoints['C'])}")
-                print(f"len(candidate_keypoints['F']) dopo add new: {len(candidate_keypoints['F'])}")
-                print(f"len(candidate_keypoints['T']) dopo add new: {len(candidate_keypoints['T'])}")
+                print(f"extended_state['C']: {extended_state['C']}")
+                print(f"extended_state['F']: {extended_state['F']}")
+                print(f"extended_state['T']: {extended_state['T']}")
+                print(f"len(extended_state['C']) dopo add new: {len(extended_state['C'])}")
+                print(f"len(extended_state['F']) dopo add new: {len(extended_state['F'])}")
+                print(f"len(extended_state['T']) dopo add new: {len(extended_state['T'])}")
 
 
-        # VALIDATE NEW POINTS
+        # VALIDATE NEW POINTS -> add them as keypoints for triangulation
         treshold = 1
         #debug
         alphas = []
         indices_to_validate = []
         if debug:
             print("\n---- VALIDATE NEW POINTS ----")
-            print(f"len(candidate_keypoints['C']): {len(candidate_keypoints['C'])}")
+            print(f"len(extended_state['C']): {len(extended_state['C'])}")
         # Consider all candidate keypoints
-        for idx in range(len(candidate_keypoints['C'])):
+        for idx in range(len(extended_state['C'])):
             # Compute the bearing vector corresponding to the current observation
-            uc, vc = candidate_keypoints['C'][idx]
+            uc, vc = extended_state['C'][idx]
             wc = np.sqrt(uc**2 + vc**2 + 1)
             vector_a = np.array([uc/wc, vc/wc, 1/wc])
 
             # Compute the bearing vector corresponding to the first observation
-            uf, vf = candidate_keypoints['F'][idx]
+            uf, vf = extended_state['F'][idx]
             wf = np.sqrt(uf**2 + vf**2 + 1)
             vector_b = np.array([uf/wf, vf/wf, 1/wf])
 
@@ -635,7 +666,7 @@ class LandmarkTriangulator():
             if alpha > treshold:
                 indices_to_validate.append(idx)
             if debug:
-                # print(f"candidate_keypoints['C'][idx]: {candidate_keypoints['C'][idx]}")
+                # print(f"extended_state['C'][idx]: {extended_state['C'][idx]}")
                 # print(f"vector_a: {vector_a}")
                 # print(f"vector_b: {vector_b}")
                 # print(f"cos: {cos}")
@@ -651,19 +682,19 @@ class LandmarkTriangulator():
         pose_3d_prin = []
         for idx in indices_to_validate:
             # Add homogeneous coordinates (1) to the 2D points
-            # point1 = np.hstack((candidate_keypoints['C'][idx], np.array((1))))
-            # point2 = np.hstack((candidate_keypoints['F'][idx], np.array((1))))
+            # point1 = np.hstack((extended_state['C'][idx], np.array((1))))
+            # point2 = np.hstack((extended_state['F'][idx], np.array((1))))
             # print(f"point1: {point1}")
             # print(f"point2: {point2}")
-            pose_3d_prin.append(candidate_keypoints['T'][idx])
+            pose_3d_prin.append(extended_state['T'][idx])
             # Triangulate the validated keypoint
-            point_3d_hom = cv2.triangulatePoints(self.K @ candidate_keypoints['T'][idx][0:3,:], self.K @ new_pose[0:3,:], candidate_keypoints['F'][idx].T,  candidate_keypoints['C'][idx].T)
+            point_3d_hom = cv2.triangulatePoints(self.K @ extended_state['T'][idx][0:3,:], self.K @ new_pose[0:3,:], extended_state['F'][idx].T,  extended_state['C'][idx].T)
             # Convert homogeneous coordinates to 3D coordinates
             #point_3d = cv2.convertPointsFromHomogeneous(point_3d_hom.T).reshape(-1, 3)
             point_3d = (point_3d_hom[0:3].T / point_3d_hom[3].T).T
 
             # Add the validated keypoint to the state
-            state['P'] = np.concatenate((state['P'], candidate_keypoints['C'][idx].reshape(1,2)), axis=0)
+            state['P'] = np.concatenate((state['P'], extended_state['C'][idx].reshape(1,2)), axis=0)
             state['X'] = np.concatenate((state['X'], point_3d.reshape(1,3)), axis=0)
             point_3d_prin.append(point_3d.reshape(3))
             
@@ -672,7 +703,7 @@ class LandmarkTriangulator():
                 # print(f"point2: {point2}")
                 print(f"point_3d_hom: {point_3d_hom}")
                 print(f"point_3d: {point_3d}")
-                print(f"candidate_keypoints['C'] validated: {candidate_keypoints['C'][idx]}")
+                print(f"extended_state['C'] validated: {extended_state['C'][idx]}")
                 # print(f"state['P'] updated: {state['P']}")
                 # print(f"state['X'] updated: {state['X']}")
         point_3d_prin = np.array(point_3d_prin)
@@ -680,7 +711,7 @@ class LandmarkTriangulator():
         # print(point_3d_prin.shape)
         # print("drawing ......")
         # plt.imshow(new_frame)
-        # plt.scatter(candidate_keypoints['C'][indices_to_validate,0],candidate_keypoints['C'][indices_to_validate,1], color='blue', marker='o', label='Points')
+        # plt.scatter(extended_state['C'][indices_to_validate,0],extended_state['C'][indices_to_validate,1], color='blue', marker='o', label='Points')
         # plt.xlim((0,1200))
         # plt.plot()
         # plt.show()
@@ -710,25 +741,26 @@ class LandmarkTriangulator():
 
         # REMOVE THE VALIDATED KEYPOINTS FROM THE CANDIDATE LIST
         if len(indices_to_validate) > 0:
-            candidate_keypoints['C'] = np.delete(candidate_keypoints['C'], indices_to_validate, axis=0)
-            candidate_keypoints['F'] = np.delete(candidate_keypoints['F'], indices_to_validate, axis=0)
-            candidate_keypoints['T'] = np.delete(candidate_keypoints['T'], indices_to_validate, axis=0)
+            extended_state['C'] = np.delete(extended_state['C'], indices_to_validate, axis=0)
+            extended_state['F'] = np.delete(extended_state['F'], indices_to_validate, axis=0)
+            extended_state['T'] = np.delete(extended_state['T'], indices_to_validate, axis=0)
 
-        len_ckC_step5 = len(candidate_keypoints['C'])
+        len_ckC_step5 = len(extended_state['C'])
+        
         if debug:
             print("\n---- REMOVE THE VALIDATED KEYPOINTS FROM THE CANDIDATE LIST ----")
-            print(f"candidate_keypoints['C'] updated: {candidate_keypoints['C']}")
-            print(f"candidate_keypoints['F'] updated: {candidate_keypoints['F']}")
-            print(f"candidate_keypoints['T'] updated: {candidate_keypoints['T']}")
-            print(f"len(candidate_keypoints['C']) dopo removal validated: {len(candidate_keypoints['C'])}")
-            print(f"len(candidate_keypoints['F']) dopo removal validated: {len(candidate_keypoints['F'])}")
-            print(f"len(candidate_keypoints['T']) dopo removal validated: {len(candidate_keypoints['T'])}")
+            print(f"extended_state['C'] updated: {extended_state['C']}")
+            print(f"extended_state['F'] updated: {extended_state['F']}")
+            print(f"extended_state['T'] updated: {extended_state['T']}")
+            print(f"len(extended_state['C']) dopo removal validated: {len(extended_state['C'])}")
+            print(f"len(extended_state['F']) dopo removal validated: {len(extended_state['F'])}")
+            print(f"len(extended_state['T']) dopo removal validated: {len(extended_state['T'])}")
 
         if debug2:
             print("\n\n---- SUM-UP CANDIDATE KEYPOINTS----")
-            print(f"len_ckC_step1 start: {len_ckC_step1}")
-            if len(p0)>0:
-                print(f"len_ckC_step2 after removal non-tracked: {len_ckC_step2}")
+            print(f"len_candidate_keypoints_1 start: {len_candidate_keypoints_1}")
+            if len(candidate_keypoints_1)>0:
+                print(f"len_candidate_keypoints_2 after removal non-tracked: {len_candidate_keypoints_2}")
                 print(f"len_ckC_step3 after update retracked: {len_ckC_step3}")
             if len(new_candidates_list) > 0:
                 print(f"len_ckC_step4 after add new ck: {len_ckC_step4}")
@@ -740,4 +772,4 @@ class LandmarkTriangulator():
 
 
 
-        return (state, candidate_keypoints, cur_des)
+        return (state, extended_state, cur_des)

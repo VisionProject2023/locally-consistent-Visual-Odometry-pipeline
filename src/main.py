@@ -7,11 +7,12 @@ import matplotlib.pyplot as plt
 from vo_pipeline import *
 
 debug = config['debug']
+visualize = config['visualization']
 
 # Setup
 if config['dataset'] == 'kitti':
     # Set kitti_path to the folder containing "05" and "poses"
-    kitti_path = '../kitti'  # replace with your path
+    kitti_path = 'kitti'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
     last_frame = 4540
@@ -66,94 +67,92 @@ print("len kps1", kps_1.shape)
 # estimate pose
 img1_img2_pose_tranform, mask = VOInit.getPoseEstimate(kps_1, kps_2)
 mask = np.hstack(mask).astype(np.bool_)
-# triangulate landmarks
+
+# triangulate landmarks, img1 and img2 are assumed to be far enough apart for accurate triangulation
 kps_1 = kps_1[mask, :]
 kps_2 = kps_2[mask,:]
 state = VOInit.get_2D_3D_landmarks_association(kps_1, kps_2, img1_img2_pose_tranform)
-print(state.keys())
-print("len P ",state['P'].shape)
-X = state['X']
-P = state['P']
 
-# plot the initialization images
-plt.figure(figsize=(10, 10))
-plt.imshow(img0, cmap='gray')
-plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20, label = 'keypoints')
-plt.xlabel('x (pixels)')
-plt.ylabel('y (pixels)')
-plt.title('Initialization Image 1 (frame %d)' % bootstrap_frames[0])
-plt.legend()
-plt.show()
-
-plt.figure(figsize=(10, 10))
-plt.imshow(img0, cmap='gray')
-plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20, label = 'keypoints')
-plt.xlabel('x (pixels)')
-plt.ylabel('y (pixels)')
-plt.title('Initialization Image 2 (frame %d)' % bootstrap_frames[1])
-plt.legend()
-plt.show()
-
-# 3D plot of the initialization 3D landmarks (X)
-# fig = plt.figure(figsize=(10, 10))
-# ax = fig.add_subplot(111, projection='3d')
-# ax.scatter(X[:, 0], X[:, 1], X[:, 2], c='r', s=20)
-# ax.set_xlabel('x (m)')
-# ax.set_ylabel('y (m)')
-# ax.set_zlabel('z (m)')
-# ax.set_title('3D landmarks (X)')
-# plt.show()
-
-# triangulated 3D Points Visualization (z-axis) of the initialization
 print("dimensione ", img1_img2_pose_tranform.shape)
 T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
 t_inv = np.linalg.inv(T_hom)
 axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
-filter = np.linalg.norm(X, axis = 1) < 50
-filter_add = np.linalg.norm(X, axis = 1) > 3
+filter = np.linalg.norm(state['X'], axis = 1) < 50
+filter_add = np.linalg.norm(state['X'], axis = 1) > 3
 filter = filter * filter_add
 print("filter len ", filter.shape)
-print("X shape ", X.shape)
-X_filtered = X[filter,:]
+print("X shape ", state['X'].shape)
+X_filtered = state['X'][filter,:]
 
-plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
-plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
-plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
-plt.xlabel('X-axis')
-plt.ylabel('Z-axis')
-plt.ylim((0,50))
-plt.xlim((-15,15))
-plt.title('triangulated 3D Points Visualization (z-axis) of the initialization')
-plt.legend() # Show legend
-plt.show() # Show the plot
+    
+if visualize:
+    # plot the initialization images
+    plt.figure(figsize=(10, 10))
+    plt.imshow(img0, cmap='gray')
+    plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20, label = 'keypoints')
+    plt.xlabel('x (pixels)')
+    plt.ylabel('y (pixels)')
+    plt.title('Initialization Image 1 (frame %d)' % bootstrap_frames[0])
+    plt.legend()
+    plt.show()
 
-# plot all and filtered 2D keypoints (img 1)
-plt.imshow(img1)
-points = kps_1[filter, :]
-print("size filtered points ", points.shape)
-plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
-plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
-plt.title('filtered 2d keypoints image 1')
-plt.plot()
-plt.show()
+    plt.figure(figsize=(10, 10))
+    plt.imshow(img0, cmap='gray')
+    plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20, label = 'keypoints')
+    plt.xlabel('x (pixels)')
+    plt.ylabel('y (pixels)')
+    plt.title('Initialization Image 2 (frame %d)' % bootstrap_frames[1])
+    plt.legend()
+    plt.show()
 
-# plot all and filtered 2D keypoints (img 2)
-plt.imshow(img1)
-points2 = kps_2[filter,:]
-plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
-plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
-plt.title('filtered 2d keypoints image 2')
-plt.plot()
-plt.show()
+    # 3D plot of the initialization 3D landmarks (X)
+    # fig = plt.figure(figsize=(10, 10))
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(X[:, 0], X[:, 1], X[:, 2], c='r', s=20)
+    # ax.set_xlabel('x (m)')
+    # ax.set_ylabel('y (m)')
+    # ax.set_zlabel('z (m)')
+    # ax.set_title('3D landmarks (X)')
+    # plt.show()
 
-debug = False
+    # triangulated 3D Points Visualization (z-axis) of the initialization
+    plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
+    plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
+    plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
+    plt.xlabel('X-axis')
+    plt.ylabel('Z-axis')
+    plt.ylim((0,50))
+    plt.xlim((-15,15))
+    plt.title('triangulated 3D Points Visualization (z-axis) of the initialization')
+    plt.legend() # Show legend
+    plt.show() # Show the plot
+
+    # plot all and filtered 2D keypoints (img 1)
+    plt.imshow(img1)
+    points = kps_1[filter, :]
+    print("size filtered points ", points.shape)
+    plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
+    plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
+    plt.title('filtered 2d keypoints image 1')
+    plt.plot()
+    plt.show()
+
+    # plot all and filtered 2D keypoints (img 2)
+    plt.imshow(img1)
+    points2 = kps_2[filter,:]
+    plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
+    plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
+    plt.title('filtered 2d keypoints image 2')
+    plt.plot()
+    plt.show()
+
 
 ### - Continuous Operation
-candidate_keypoints = {}
-candidate_keypoints['C'] = np.array([])
-candidate_keypoints['F'] = np.array([])
-candidate_keypoints['T'] = np.array([])
+extended_state = {}
+extended_state['C'] = np.array([])
+extended_state['F'] = np.array([])
+extended_state['T'] = np.array([])
 
 sift = cv2.SIFT.create()
 _, old_des = sift.detectAndCompute(img1, None) # this should come from the initialization and we should start from img2
@@ -162,7 +161,7 @@ _, old_des = sift.detectAndCompute(img1, None) # this should come from the initi
 #instantiate BestVision:
 vision = BestVision(K) 
 vision.state = state
-vision.candidate_keypoints = candidate_keypoints
+vision.extended_state = extended_state
 cur_pose = img1_img2_pose_tranform # cur_pose is the position of frame 2 now!
 if debug:
     print(f"img1_img2_pose_tranform: {img1_img2_pose_tranform}")
@@ -172,10 +171,8 @@ associate = KeypointsToLandmarksAssociator(K, T_hom)
 pose_estimator = PoseEstimator(K)
 
 
-
-
 axis_list = []
-for img_idx in range(3,700):
+for img_idx in range(2,60): #was 3, 700
     print(f"\n\n\n\n---------- IMG {img_idx} ----------")
     # loading the next image
     if config['dataset'] == 'kitti':
@@ -190,11 +187,10 @@ for img_idx in range(3,700):
     else:
         raise ValueError("Invalid dataset selection")
 
-    # instantiate Landmark association
-
-    new_state, new_candidates_list = associate.associateKeypoints(img1, img2, vision.state)
+    # associate the new keypoints (img 2) to the existing landmarks (X) 
+    new_state, keypoints_tracking_lost = associate.associateKeypointsToLandmarks(img1, img2, vision.state)
     if debug:
-        print(f"new_candidates_list: {new_candidates_list}")
+        print(f"keypoints_tracking_lost: {keypoints_tracking_lost}")
         print(f"len(state_2['P']): {len(new_state['P'])}")
 
     # estimate the pose of the new frame and update 
@@ -232,22 +228,25 @@ for img_idx in range(3,700):
 
     # Add new landmark triangulations to the state
     landmark_triangulator = LandmarkTriangulator(K, old_des)
-    new_state, candidate_keypoints, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, new_state, candidate_keypoints, new_candidates_list, new_pose)
+    new_state, extended_state, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
+    
+    # was new_state, extended_state, cur_des
     
     # if debug:
     #     print(f"new_state: {new_state}")
-    #     print(f"candidate_keypoints: {candidate_keypoints}")
+    #     print(f"extended_state: {extended_state}")
 
     # update the state
     vision.state = new_state
-    vision.candidate_keypoints = candidate_keypoints
+    vision.extended_state = extended_state
     img1 = img2
     old_des = cur_des
+    
 plt.show()
 
     # if debug:
     #     print(f"vision.state: {vision.state}")
-    #     print(f"vision.candidate_keypoints: {vision.candidate_keypoints}")
+    #     print(f"vision.extended_state: {vision.extended_state}")
 # ***** DEBUG *****
 # plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
 # print("dimensione ", img1_img2_pose_tranform.shape)
