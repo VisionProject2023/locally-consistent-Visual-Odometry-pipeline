@@ -9,6 +9,6 @@ init_detector_descriptor: 'sift'
 debug: False
 
 # visualization
-visualization: True
+visualization: False
 
 

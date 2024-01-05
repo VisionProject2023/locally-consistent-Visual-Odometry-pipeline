@@ -5,6 +5,7 @@ from typing import Dict
 import cv2
 import yaml
 import pdb
+from scipy.spatial import cKDTree
 
 # type hinting guideline: images in openCV are numpy arrays
 
@@ -424,10 +425,58 @@ class LandmarkTriangulator():
         self.K = K
         self.old_des = old_des
 
-        pass
+    def find_new_candidates_shi_sift(self, new_frame: np.ndarray, state: dict, keypoints_well_tracked) -> list: 
+        debug = False
+        
+        # make a mask (type  type uint8/logical), exclude the well_tracked pixels from the Shi-Tomashi corner detector
+        mask = np.ndarray(shape=(new_frame.shape[0], new_frame.shape[1]), dtype=np.uint8)
+        # turn all the mask values to 255 by default
+        mask.fill(255)
+        # turn the mask to zero at the pixel positions of keypoints_well_tracked
+        for i in range(len(keypoints_well_tracked)):
+            y, x = int(keypoints_well_tracked[i][1]), int(keypoints_well_tracked[i][0])
+            if 0 <= y < mask.shape[0] and 0 <= x < mask.shape[1]:
+                mask[y, x] = 0
+        
+        # Shi-Tomashi corner detector, to test and figure out (will probably have to change the type of kps_f1 to cv.KeyPoint)
+        new_keypoints = cv2.goodFeaturesToTrack(new_frame, maxCorners=350, qualityLevel=0.01, minDistance=10, mask=mask, blockSize=4, gradientSize=3, useHarrisDetector=False, k=0.04)
+
+        # Convert keypoints to cv2.KeyPoint format
+        new_keypoints = [cv2.KeyPoint(x=pt[0][0], y=pt[0][1], size=20) for pt in new_keypoints]
+        
+        # Use the sift descriptor to describe the new keypoints
+        sift = cv2.SIFT.create()
+        new_keypoints, cur_des = sift.compute(new_frame, new_keypoints) # describes the features in frame 1
+
+        new_keypoints = np.array([kp.pt for kp in new_keypoints])
+        non_duplicate_new_keypoints = new_keypoints
+
+        # # match the new keypoints with the old ones ()
+        # bf = cv2.BFMatcher.create(cv2.NORM_L2, crossCheck=False) # crossCheck=True is an alternative to the ratiotest (proposed by D. Lowe in SIFT paper)	
+        # kp_matches = bf.knnMatch(self.old_des, cur_des, k=2) # k=2: return the two best matches for each descriptor
+        
+        # # Apply ratio test (preventing false matches)
+        # good_kp_matches = [m for m, n in kp_matches if m.distance < 0.8 * n.distance] # making the matching extra hard -> 0.6 criteria
+    
+        # Remove the duplicate keypoints
+        # old_keypoints = np.array([new_keypoints[match.trainIdx].pt for match in good_kp_matches])
+        
+        # mask = np.isin(new_keypoints, old_keypoints, invert=True).all(axis=1)
+        # non_duplicate_new_keypoints = new_keypoints[mask]
+
+        # if debug:
+        #     print("\n---- FIND NEW CANDIDATES ----")
+        #     print(f"keypoints: {new_keypoints}")
+        #     print(f"old_keypoints: {old_keypoints}")
+        #     print(f"len(state['P']): {len(state['P'])}")
+        #     print(f"len(new_keypoints): {len(new_keypoints)}")
+        #     print(f"mask: {mask}")
+        #     print(f"non_duplicate_new_kp: {non_duplicate_new_keypoints}")
+
+
+        return non_duplicate_new_keypoints
 
     def find_new_candidates(self, new_frame: np.ndarray, state: dict, extended_state: dict) -> list:
-        # we should try a KLT implementation for this!
         
         debug = False
         
@@ -439,10 +488,7 @@ class LandmarkTriangulator():
         kp_matches = bf.knnMatch(self.old_des, cur_des, k=2) # k=2: return the two best matches for each descriptor
 
         # Apply ratio test (preventing false matches)
-        good_kp_matches = []
-        for m,n in kp_matches:
-            if m.distance < 0.8*n.distance: # "distance" = distance function = how similar are the descriptors
-                good_kp_matches.append(m)
+        good_kp_matches = [m for m, n in kp_matches if m.distance < 0.8 * n.distance]
 
         # new_keypoints -> the good matches that didn't appear in the previous (old) image
         old_keypoints = np.array([keypoints[match.trainIdx].pt for match in good_kp_matches])
@@ -467,28 +513,29 @@ class LandmarkTriangulator():
 
         return (new_keypoints, cur_des)
     
-    def find_new_candidates_2(self, new_frame: np.ndarray, state: dict, extended_state: dict, keypoints_well_tracked) -> list: 
     
-        # Shi-Tomashi corner detector, to test and figure out (will probably have to change the type of kps_f1 to cv.KeyPoint)
-        new_keypoints = cv2.goodFeaturesToTrack(new_frame, maxCorners=100, qualityLevel=0.02, minDistance=10, mask=None, blockSize=4, gradientSize=3, useHarrisDetector=False, k=0.04)
+    
+    def find_new_candidates_pixel_locations(self, new_frame: np.ndarray, state: dict, extended_state: dict, keypoints_well_tracked) -> list: 
         
         # remove one dimension
-        new_keypoints = np.squeeze(new_keypoints)
+        #new_keypoints = np.squeeze(new_keypoints)
         
-        # Convert keypoints to cv2.KeyPoint format
-        #new_keypoints = [cv2.KeyPoint(x=pt[0][0], y=pt[0][1], size=20) for pt in new_keypoints]
+        # check how close the new keypoints are to the old ones (distance < 2)
+        #distance = 1
+        #non_duplicate_new_keypoints = []
     
-        for keypoint_well_tracked in keypoints_well_tracked:
-            # check how close the new keypoints are to the old ones (distance < 2)
-            distance = [np.sqrt((keypoint_well_tracked[0] - new_keypoints[i][0])**2 + ((keypoint_well_tracked[1] - new_keypoints[i][1]))**2) < 2 for i in range(len(new_keypoints))]
-            # remove the keypoints that are too close to the old ones
-            new_keypoints = [new_keypoints[i] for i in range(len(new_keypoints)) if distance[i] == True]
-            
+        # for new_keypoint in new_keypoints:
+        #     too_close = [np.sqrt((keypoints_well_tracked[i][0] - new_keypoint[0])**2 + ((keypoints_well_tracked[i][1] - new_keypoint[1]))**2) < distance for i in range(len(keypoints_well_tracked))]
+        #     # remove the keypoints that are too close to the old ones
+        #     if not any(too_close): 
+        #         non_duplicate_new_keypoints.append(new_keypoint.tolist())
+        
+        # # convert the list in a numpy array
+        # non_duplicate_new_keypoints = np.array(non_duplicate_new_keypoints)
+        
         #kps_f1_KLT = cv2.KeyPoint_convert(kps_f1) # Convert to Point2f format for KLT tracker
+        pass
         
-    
-        return new_keypoints
-
 
     def triangulate_landmark(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict, extended_state: dict, new_pose) -> dict:
         '''
@@ -504,12 +551,8 @@ class LandmarkTriangulator():
         Output:
             new_landmarks: dictionary with keys 'P' and 'X'  for the new identified landmarks
         '''
-
-        # idea: add an if statement that the sift descriptor matching approach will be executed when the optical flow fails
-
         
         # ATTENTION: construct extended_state['T'] as a three-dimensional vector (K,4,4) !!!
-
         
         # keypoints_tracking_lost are the keypoints in the previous image that could not be tracked to the new image during KLT
         
@@ -544,6 +587,7 @@ class LandmarkTriangulator():
         if len(candidate_keypoints_1)>0:
 
             candidate_keypoints_2, st, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, candidate_keypoints_1, None)
+            # candidate_keypoints_2 is in floating values and depict the pixel coordinates of the next image (the can fall outside of the normal image boundaries)
             st = np.hstack(st).astype(np.bool_)
             if candidate_keypoints_2 is not None:
                 candidate_keypoints_2_well_tracked = candidate_keypoints_2[st==1]
@@ -552,6 +596,8 @@ class LandmarkTriangulator():
                 
             if len(candidate_keypoints_1_well_tracked) != len(candidate_keypoints_2_well_tracked):
                 print(f"ERROR: candidate_keypoints_1_well_tracked and candidate_keypoints_2_well_tracked do not have the same length. len(candidate_keypoints_1_well_tracked)={len(candidate_keypoints_1_well_tracked)}!={len(candidate_keypoints_2_well_tracked)}=len(candidate_keypoints_2_well_tracked)")
+                print("stop!!!")
+                
             if debug:
                 print("\n---- TRACK CANDIDATE KEYPOINTS ----")
                 print(f"candidate_keypoints_2: {candidate_keypoints_2}")
@@ -559,7 +605,7 @@ class LandmarkTriangulator():
                 print(f"candidate_keypoints_1_well_tracked: {candidate_keypoints_1_well_tracked}")
 
             # Create a boolean mask to identify the positions of the tracked candidate keypoints to be updated
-            mask = np.isin(extended_state['C'], candidate_keypoints_1_well_tracked).all(axis=1)
+            mask = np.isin(candidate_keypoints_2, candidate_keypoints_2_well_tracked).all(axis=1)
             extended_state['C'][mask] = candidate_keypoints_2_well_tracked # Update all the candidate keypoints that have been retracked
 
             len_ckC_step3 = len(extended_state['C'])
@@ -598,10 +644,12 @@ class LandmarkTriangulator():
                 print(f"len(extended_state['T']) dopo rimozione untracked: {len(extended_state['T'])}")
                 
         if len(candidate_keypoints_1)==0:
-            candidate_keypoints_2_well_tracked = []
+            candidate_keypoints_1_well_tracked = []
 
         # 2) Add new candidate keypoints
-        new_candidates_list, cur_des = self.find_new_candidates(new_frame, state, extended_state) #, candidate_keypoints_2_well_tracked)
+        new_candidates_list = self.find_new_candidates_shi_sift(new_frame, state, candidate_keypoints_1_well_tracked)
+        #new_candidates_list, cur_des = self.find_new_candidates(new_frame, state, extended_state) #, candidate_keypoints_2_well_tracked)
+        
         if debug:
             print(f"new candidates list: {new_candidates_list}")
             
@@ -634,7 +682,7 @@ class LandmarkTriangulator():
                 print(f"len(extended_state['T']) dopo add new: {len(extended_state['T'])}")
 
 
-        # VALIDATE NEW POINTS -> add them as keypoints for triangulation
+        # 3) validate new points (when the baseline is big enough to produce accurate triangulation) (from candidate keypoints to real keypoints used for triangulation)
         treshold = 1
         #debug
         alphas = []
@@ -772,4 +820,4 @@ class LandmarkTriangulator():
 
 
 
-        return (state, extended_state, cur_des)
+        return (state, extended_state)

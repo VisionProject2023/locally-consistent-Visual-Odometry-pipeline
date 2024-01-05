@@ -15,7 +15,8 @@ if config['dataset'] == 'kitti':
     kitti_path = 'kitti'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
-    last_frame = 4540
+    kitti_images = [img for img in os.listdir(f'{kitti_path}/05/image_0') if img.endswith('.png')]
+    last_frame = len(kitti_images) - 1 
     K = np.array([[718.856, 0, 607.1928],
                   [0, 718.856, 185.2157],
                   [0, 0, 1]])
@@ -26,11 +27,12 @@ if config['dataset'] == 'kitti':
 
 elif config['dataset'] == 'malaga':
     # Set malaga_path to the folder containing Malaga dataset
-    malaga_path = 'path_to_malaga_dataset'  # replace with your path
+    malaga_path = 'malaga-urban-dataset-extract-07'  # replace with your path
     assert os.path.exists(malaga_path), "Malaga path does not exist"
-    left_images = [img for img in os.listdir(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images') if img.endswith('.png')]
+    #ground_truth = np.loadtxt(f'{malaga_path}/poses/05.txt')[:, -9:-7]
+    left_images = [img for img in os.listdir(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images') if img.endswith('.jpg')]
     left_images.sort()
-    last_frame = len(left_images)
+    last_frame = len(left_images) -1 
     K = np.array([[621.18428, 0, 404.0076],
                   [0, 621.18428, 309.05989],
                   [0, 0, 1]])
@@ -38,13 +40,17 @@ elif config['dataset'] == 'malaga':
     bootstrap_frames = [0, 2]
     img0 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[0]]}', cv2.IMREAD_GRAYSCALE)
     img1 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[1]]}', cv2.IMREAD_GRAYSCALE)
-
+    
 elif config['dataset'] == 'parking':
     # Set parking_path to the folder containing parking dataset
     parking_path = 'parking'  # replace with your path
     assert os.path.exists(parking_path), "Parking path does not exist"
-    last_frame = 598
-    K = np.loadtxt(f'{parking_path}/K.txt')
+    parking_images = [img for img in os.listdir(f'{parking_path}/images') if img.endswith('.png')]
+    last_frame = len(parking_images) - 1
+    K = np.array([[331.37, 0, 320],
+                [0, 369.568, 240],
+                [0, 0, 1]])
+    
     ground_truth = np.loadtxt(f'{parking_path}/poses.txt')[:, -9:-7]
     
     bootstrap_frames = [0, 2]
@@ -157,7 +163,6 @@ extended_state['T'] = np.array([])
 sift = cv2.SIFT.create()
 _, old_des = sift.detectAndCompute(img1, None) # this should come from the initialization and we should start from img2
 
-
 #instantiate BestVision:
 vision = BestVision(K) 
 vision.state = state
@@ -171,18 +176,21 @@ associate = KeypointsToLandmarksAssociator(K, T_hom)
 pose_estimator = PoseEstimator(K)
 
 
-axis_list = []
-for img_idx in range(2,60): #was 3, 700
+#axis_list = []
+X_plotting = np.array([])
+poses_plotting = np.array([])
+final_frame = last_frame # if you want to adjust the end frame
+for img_idx in range(2,final_frame): #was 3, 700
     print(f"\n\n\n\n---------- IMG {img_idx} ----------")
     # loading the next image
     if config['dataset'] == 'kitti':
         img2 = cv2.imread(f'{kitti_path}/05/image_0/{img_idx:06d}.png', cv2.IMREAD_GRAYSCALE)
 
     elif config['dataset'] == 'malaga':
-        img2 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[2]]}', cv2.IMREAD_GRAYSCALE)
+        img2 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[img_idx]}', cv2.IMREAD_GRAYSCALE)
 
     elif config['dataset'] == 'parking':
-        img2 = cv2.imread(f'{parking_path}/images/img_{bootstrap_frames[2]:05d}.png', cv2.IMREAD_GRAYSCALE)
+        img2 = cv2.imread(f'{parking_path}/images/img_{img_idx:05d}.png', cv2.IMREAD_GRAYSCALE)
 
     else:
         raise ValueError("Invalid dataset selection")
@@ -197,15 +205,16 @@ for img_idx in range(2,60): #was 3, 700
     new_pose = pose_estimator.estimatePose(new_state) # T_world_newframe
     if debug:
         print(f"new_pose (T_world_newframe): {new_pose}")
-        
-    # maybe save the pose in an array (to plot later)
-    # associate.update_pose(T_world_newframe)
     
-    # plotting functionality (3D landmarks)
     axis = np.linalg.inv(new_pose) @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
     pos_h = np.zeros(4)
     pos_h[3] = 1
     pos = (np.linalg.inv(new_pose) @ pos_h)[0:3]
+    
+    # add the new pose to the plotting array
+    poses_plotting = np.vstack((poses_plotting, pos)) if poses_plotting.size else pos
+    
+    # add the new 3D landmarks close <50 to the current position to the plotting aray
     X = vision.state['X']
     filter = np.linalg.norm(X - pos, axis = 1) < 50
     filter_add = np.linalg.norm(X - pos, axis = 1) > 3
@@ -213,68 +222,43 @@ for img_idx in range(2,60): #was 3, 700
     print("filter len ", filter.shape)
     print("X shape ", X.shape)
     X_filtered = X[filter,:]
-    plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
-
-    plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'b-')
-    plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
-    for ax in axis_list:
-        plt.plot([ax[0,3],ax[0,0]],[ax[2,3], ax[2,0]], 'b-')
-        plt.plot([ax[0,3],ax[0,2]],[ax[2,3], ax[2,2]], 'r-')
-    axis_list.append(axis)
+    X_plotting = np.vstack((X_plotting, X_filtered)) if X_plotting.size else X_filtered
+    
+    # add the car path to the plotting array
+    #axis_list.append(axis)
     plt.xlabel('X-axis')
     plt.ylabel('Z-axis')
     # plt.axis('square')
-    plt.title('2D Points Visualization')
+    plt.title('Travelled Path and 3D Landmarks Visualization')
 
     # Add new landmark triangulations to the state
     landmark_triangulator = LandmarkTriangulator(K, old_des)
-    new_state, extended_state, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
-    
+    new_state, extended_state = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
     # was new_state, extended_state, cur_des
     
-    # if debug:
-    #     print(f"new_state: {new_state}")
-    #     print(f"extended_state: {extended_state}")
-
     # update the state
     vision.state = new_state
     vision.extended_state = extended_state
     img1 = img2
-    old_des = cur_des
     
+# plot the 3D landmarks
+plt.scatter(X_plotting[:,0], X_plotting[:,2], color='blue', marker='o', label='3D Landmarks')
+
+# plot the ground truth path in green
+# plt.plot(ground_truth[:,0], ground_truth[:,1], 'g-', label='Ground Truth')
+
+# plot the travelled car path (positions) in red
+plt.plot(poses_plotting[:,0], poses_plotting[:,2], 'r-', label='Travelled Path')
+
+# I have no idea what this does here?
+# for ax in axis_list:
+#         plt.plot([ax[0,3],ax[0,0]],[ax[2,3], ax[2,0]], 'b-') # plotting a line
+#         plt.plot([ax[0,3],ax[0,2]],[ax[2,3], ax[2,2]], 'r-', label = 'Travelled Path') # plotting a line
+        
+plt.legend() # Show legend
+
+plt.savefig('%s_trajectory_and_3Dlandmarks_%s_frames_final_ShiTomashi_SIFT.png' % (config['dataset'], final_frame))
 plt.show()
 
-    # if debug:
-    #     print(f"vision.state: {vision.state}")
-    #     print(f"vision.extended_state: {vision.extended_state}")
-# ***** DEBUG *****
-# plot a filtered version of the 3D landmarks (X) (some bugs, comes from Riccardo)
-# print("dimensione ", img1_img2_pose_tranform.shape)
-# T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
-# t_inv = np.linalg.inv(T_hom)
-# axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
-
-# t_inv_2 = np.linalg.inv(T_world_newframe)
-# axis_2 = t_inv_2 @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
-
-# filter = np.linalg.norm(X, axis = 1) < 10
-# filter_add = np.linalg.norm(X, axis = 1) > 3
-# filter = filter * filter_add
-# print("filter len ", filter.shape)
-# print("X shape ", X.shape)
-# X_filtered = X[filter,:]
-# plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
-# plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
-# plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
-# plt.plot([axis_2[0,3],axis_2[0,0]],[axis_2[2,3], axis_2[2,0]], 'b-')
-# plt.plot([axis_2[0,3],axis_2[0,2]],[axis_2[2,3], axis_2[2,2]], 'b-')
-# plt.xlabel('X-axis')
-# plt.ylabel('Z-axis')
-# plt.ylim((0,10))
-# plt.xlim((-5,5))
-# plt.title('2D Points Visualization')
-# plt.legend() # Show legend
-# plt.show() # Show the plot
-#*****************
 
 #%%
