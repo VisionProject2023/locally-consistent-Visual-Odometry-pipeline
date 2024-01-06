@@ -5,5 +5,10 @@ dataset: 'kitti' # kitti, malaga or parking
 # initialization parameters
 init_detector_descriptor: 'sift'
 
+# debug
+debug: False
+
+# visualization
+visualization: True
 
 
