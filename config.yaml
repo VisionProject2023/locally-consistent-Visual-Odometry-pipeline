@@ -2,6 +2,9 @@
 # dataset choise
 dataset: 'kitti' # kitti, malaga or parking
 
+# find new candidates method
+find_new_candidates_method: 'sift_sift' # 'shi-sift' or 'sift-sift'
+
 # initialization parameters
 init_detector_descriptor: 'sift'
 
@@ -10,5 +13,7 @@ debug: False
 
 # visualization
 visualization: False
+
+
 
 

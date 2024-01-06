@@ -21,7 +21,7 @@ if config['dataset'] == 'kitti':
                   [0, 718.856, 185.2157],
                   [0, 0, 1]])
     
-    bootstrap_frames = [0, 2]
+    bootstrap_frames = [0,2]# [3,5] [0, 2]
     img0 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[0]:06d}.png', cv2.IMREAD_GRAYSCALE)
     img1 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[1]:06d}.png', cv2.IMREAD_GRAYSCALE)
 
@@ -180,7 +180,7 @@ pose_estimator = PoseEstimator(K)
 X_plotting = np.array([])
 poses_plotting = np.array([])
 final_frame = last_frame # if you want to adjust the end frame
-for img_idx in range(2,final_frame): #was 3, 700
+for img_idx in range(bootstrap_frames[1],final_frame): #was 3, 700
     print(f"\n\n\n\n---------- IMG {img_idx} ----------")
     # loading the next image
     if config['dataset'] == 'kitti':
@@ -225,11 +225,26 @@ for img_idx in range(2,final_frame): #was 3, 700
     X_plotting = np.vstack((X_plotting, X_filtered)) if X_plotting.size else X_filtered
     
     # add the car path to the plotting array
-    #axis_list.append(axis)
     plt.xlabel('X-axis')
     plt.ylabel('Z-axis')
     # plt.axis('square')
     plt.title('Travelled Path and 3D Landmarks Visualization')
+    
+    # plot every 200 frames
+    if img_idx % 200 == 0:
+        # plot the 3D landmarks
+        plt.scatter(X_plotting[:,0], X_plotting[:,2], color='blue', marker='o', label='3D Landmarks')
+
+        # plot the ground truth path in green
+        # plt.plot(ground_truth[:,0], ground_truth[:,1], 'g-', label='Ground Truth')
+
+        # plot the travelled car path (positions) in red
+        plt.plot(poses_plotting[:,0], poses_plotting[:,2], 'r-', label='Travelled Path')
+
+        plt.legend() # Show legend
+        plt.savefig('%s_trajectory_and_3Dlandmarks__%s-%s_frames_final_KLT_%s.png' % (config['dataset'], bootstrap_frames[0], img_idx, config['find_new_candidates_method']))
+        plt.clf()
+        print('New plot saved!')
 
     # Add new landmark triangulations to the state
     landmark_triangulator = LandmarkTriangulator(K, old_des)
@@ -250,14 +265,8 @@ plt.scatter(X_plotting[:,0], X_plotting[:,2], color='blue', marker='o', label='3
 # plot the travelled car path (positions) in red
 plt.plot(poses_plotting[:,0], poses_plotting[:,2], 'r-', label='Travelled Path')
 
-# I have no idea what this does here?
-# for ax in axis_list:
-#         plt.plot([ax[0,3],ax[0,0]],[ax[2,3], ax[2,0]], 'b-') # plotting a line
-#         plt.plot([ax[0,3],ax[0,2]],[ax[2,3], ax[2,2]], 'r-', label = 'Travelled Path') # plotting a line
-        
 plt.legend() # Show legend
-
-plt.savefig('%s_trajectory_and_3Dlandmarks_%s_frames_final_ShiTomashi_SIFT.png' % (config['dataset'], final_frame))
+plt.savefig('%s_trajectory_and_3Dlandmarks__%s-%s_frames_final_KLT_%s.png' % (config['dataset'], bootstrap_frames[0], final_frame, config['find_new_candidates_method']))
 plt.show()
 
 
