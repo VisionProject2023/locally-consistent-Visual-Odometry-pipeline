@@ -1,6 +1,6 @@
 
 # dataset choise
-dataset: 'kitti' # kitti, malaga or parking
+dataset: 'kitti' # kitti-dataset, malaga or parking
 
 # find new candidates method
 find_new_candidates_method: 'sift-sift-des-compare' # 'shi-sift', 'sift-sift' or 'sift-sift-des-compare'

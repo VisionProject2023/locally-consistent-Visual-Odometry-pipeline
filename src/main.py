@@ -12,7 +12,7 @@ visualize = config['visualization']
 # Setup
 if config['dataset'] == 'kitti':
     # Set kitti_path to the folder containing "05" and "poses"
-    kitti_path = 'kitti'  # replace with your path
+    kitti_path = 'kitti-dataset'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
     ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
     kitti_images = [img for img in os.listdir(f'{kitti_path}/05/image_0') if img.endswith('.png')]

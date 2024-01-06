@@ -586,7 +586,9 @@ class LandmarkTriangulator():
                 print(f"candidate_keypoints_1_well_tracked: {candidate_keypoints_1_well_tracked}")
 
             # Create a boolean mask to identify the positions of the tracked candidate keypoints to be updated
-            mask = np.isin(candidate_keypoints_2, candidate_keypoints_2_well_tracked).all(axis=1)
+            # mask = np.isin(candidate_keypoints_2, candidate_keypoints_2_well_tracked).all(axis=1)
+            # extended_state['C'][mask] = candidate_keypoints_2_well_tracked 
+            mask = np.isin(extended_state['C'], candidate_keypoints_1_well_tracked).all(axis=1)
             extended_state['C'][mask] = candidate_keypoints_2_well_tracked # Update all the candidate keypoints that have been retracked
 
             len_ckC_step3 = len(extended_state['C'])
