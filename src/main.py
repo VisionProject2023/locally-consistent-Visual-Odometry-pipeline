@@ -242,7 +242,7 @@ for img_idx in range(bootstrap_frames[1],final_frame): #was 3, 700
         plt.plot(poses_plotting[:,0], poses_plotting[:,2], 'r-', label='Travelled Path')
 
         plt.legend() # Show legend
-        plt.savefig('%s_trajectory_and_3Dlandmarks__%s-%s_frames_final_KLT_%s.png' % (config['dataset'], bootstrap_frames[0], img_idx, config['find_new_candidates_method']))
+        plt.savefig('plots/%s_trajectory_and_3Dlandmarks__%s-%s_frames_final_KLT_%s.png' % (config['dataset'], bootstrap_frames[0], img_idx, config['find_new_candidates_method']))
         plt.clf()
         print('New plot saved!')
 
@@ -269,7 +269,7 @@ plt.scatter(X_plotting[:,0], X_plotting[:,2], color='blue', marker='o', label='3
 plt.plot(poses_plotting[:,0], poses_plotting[:,2], 'r-', label='Travelled Path')
 
 plt.legend() # Show legend
-plt.savefig('%s_trajectory_and_3Dlandmarks__%s-%s_frames_final_KLT_%s.png' % (config['dataset'], bootstrap_frames[0], final_frame, config['find_new_candidates_method']))
+plt.savefig('plots/%s_trajectory_and_3Dlandmarks__%s-%s_frames_final_KLT_%s.png' % (config['dataset'], bootstrap_frames[0], final_frame, config['find_new_candidates_method']))
 plt.show()
 
 

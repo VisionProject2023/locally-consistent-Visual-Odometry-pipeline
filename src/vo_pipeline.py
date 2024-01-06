@@ -373,7 +373,7 @@ class PoseEstimator():
 
         """ Constants """
         self.REPOJ_THRESH = 2    # was 2, threshold on the reprojection error of points accepted as inliers
-        self.CONFIDENCE = 0.999995   # desired confidence of result
+        self.CONFIDENCE = 0.99999   # desired confidence of result
     
     def estimatePose(self, associations: Dict[np.ndarray,np.ndarray]) -> np.ndarray:
         '''
