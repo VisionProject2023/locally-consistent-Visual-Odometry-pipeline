@@ -3,7 +3,7 @@
 dataset: 'kitti' # kitti, malaga or parking
 
 # find new candidates method
-find_new_candidates_method: 'sift_sift' # 'shi-sift' or 'sift-sift'
+find_new_candidates_method: 'sift-sift-des-compare' # 'shi-sift', 'sift-sift' or 'sift-sift-des-compare'
 
 # initialization parameters
 init_detector_descriptor: 'sift'

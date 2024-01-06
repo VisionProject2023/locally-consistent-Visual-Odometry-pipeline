@@ -248,13 +248,16 @@ for img_idx in range(bootstrap_frames[1],final_frame): #was 3, 700
 
     # Add new landmark triangulations to the state
     landmark_triangulator = LandmarkTriangulator(K, old_des)
-    new_state, extended_state = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
-    # was new_state, extended_state, cur_des
+    if config['find_new_candidates_method'] == 'sift-sift-des-compare':
+        new_state, extended_state, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
+    else:
+        new_state, extended_state = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
     
     # update the state
     vision.state = new_state
     vision.extended_state = extended_state
     img1 = img2
+    cur_des = old_des
     
 # plot the 3D landmarks
 plt.scatter(X_plotting[:,0], X_plotting[:,2], color='blue', marker='o', label='3D Landmarks')
