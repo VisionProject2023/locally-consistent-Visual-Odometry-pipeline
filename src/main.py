@@ -251,7 +251,7 @@ for img_idx in range(bootstrap_frames[1],final_frame): #was 3, 700
     if config['find_new_candidates_method'] == 'sift-sift-des-compare':
         new_state, extended_state, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
     else:
-        new_state, extended_state = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
+        new_state, extended_state, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
     
     # update the state
     vision.state = new_state

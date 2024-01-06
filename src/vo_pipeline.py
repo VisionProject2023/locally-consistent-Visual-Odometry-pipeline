@@ -373,7 +373,7 @@ class PoseEstimator():
 
         """ Constants """
         self.REPOJ_THRESH = 2    # was 2, threshold on the reprojection error of points accepted as inliers
-        self.CONFIDENCE = 0.99999   # desired confidence of result
+        self.CONFIDENCE = 0.999995   # desired confidence of result
     
     def estimatePose(self, associations: Dict[np.ndarray,np.ndarray]) -> np.ndarray:
         '''
@@ -434,7 +434,6 @@ class LandmarkTriangulator():
         self.old_des = old_des
 
     def find_new_candidates_shi_sift(self, new_frame: np.ndarray, state: dict, keypoints_well_tracked) -> list: 
-        debug = False
         
         # make a mask (type  type uint8/logical), exclude the well_tracked pixels from the Shi-Tomashi corner detector
         mask = np.ndarray(shape=(new_frame.shape[0], new_frame.shape[1]), dtype=np.uint8)
@@ -479,9 +478,9 @@ class LandmarkTriangulator():
         new_keypoints = np.array([kp.pt for kp in new_keypoints])
         non_duplicate_new_keypoints = new_keypoints
 
-        return non_duplicate_new_keypoints, cur_des
+        return non_duplicate_new_keypoints
     
-    def find_new_candidates_des_compare(self, new_frame: np.ndarray, state: dict, extended_state: dict) -> list:
+    def find_new_candidates_sift_sift_des_compare(self, new_frame: np.ndarray, state: dict, extended_state: dict) -> list:
         
         debug = False
         
@@ -631,12 +630,12 @@ class LandmarkTriangulator():
         # 2) Add new candidate keypoints
         new_candidates_list = []
         cur_des = []
-        if config['find_new_candidates_method'] == 'shi_sift':
+        if config['find_new_candidates_method'] == 'shi-sift':
             new_candidates_list = self.find_new_candidates_shi_sift(new_frame, state, candidate_keypoints_1_well_tracked)
-        if config['find_new_candidates_method'] == 'sift_sift':
+        elif config['find_new_candidates_method'] == 'sift-sift':
             new_candidates_list = self.find_new_candidates_sift_sift(new_frame, state, candidate_keypoints_1_well_tracked)
-        if config['find_new_candidates_method'] == 'sift_sift_des_compare':
-            new_candidates_list, cur_des = self.find_new_candidates_des_compare(new_frame, state, extended_state)
+        elif config['find_new_candidates_method'] == 'sift-sift-des-compare':
+            new_candidates_list, cur_des = self.find_new_candidates_sift_sift_des_compare(new_frame, state, extended_state)
             
         
         if debug:
