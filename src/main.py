@@ -21,7 +21,7 @@ if config['dataset'] == 'kitti':
                   [0, 718.856, 185.2157],
                   [0, 0, 1]])
     
-    bootstrap_frames = [0,2]# [3,5] [0, 2]
+    bootstrap_frames = [0,6] # [0,6]
     img0 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[0]:06d}.png', cv2.IMREAD_GRAYSCALE)
     img1 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[1]:06d}.png', cv2.IMREAD_GRAYSCALE)
 
@@ -69,6 +69,7 @@ VOInit = VOInitializer(K)
 # detect, describe and match features
 kps_1, kps_2 = VOInit.getKeypointMatches(img0, img1)
 print("len kps1", kps_1.shape)
+print("len kps2", kps_2.shape)
 
 # estimate pose
 img1_img2_pose_tranform, mask = VOInit.getPoseEstimate(kps_1, kps_2)
@@ -84,32 +85,37 @@ T_hom = np.vstack((img1_img2_pose_tranform, np.array([0,0,0,1])))
 t_inv = np.linalg.inv(T_hom)
 axis = t_inv @ np.vstack((np.hstack((np.eye(3), np.zeros((3,1)))), np.ones((4,1)).T))
 
+pos_h = np.zeros(4)
+pos_h[3] = 1
+pos = (np.linalg.inv(T_hom) @ pos_h)[0:3]
+
 filter = np.linalg.norm(state['X'], axis = 1) < 50
 filter_add = np.linalg.norm(state['X'], axis = 1) > 3
 filter = filter * filter_add
 print("filter len ", filter.shape)
 print("X shape ", state['X'].shape)
 X_filtered = state['X'][filter,:]
-
     
 if visualize:
     # plot the initialization images
-    plt.figure(figsize=(10, 10))
+    plt.figure(figsize=(10, 6))
     plt.imshow(img0, cmap='gray')
     plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20, label = 'keypoints')
     plt.xlabel('x (pixels)')
     plt.ylabel('y (pixels)')
     plt.title('Initialization Image 1 (frame %d)' % bootstrap_frames[0])
     plt.legend()
+    plt.savefig('initialization-plots/%s_initialization_img1_%s-%s_frames_detector_%s.png' % (config['dataset'], bootstrap_frames[0], bootstrap_frames[1], config['init_detector']))
     plt.show()
 
-    plt.figure(figsize=(10, 10))
-    plt.imshow(img0, cmap='gray')
+    plt.figure(figsize=(10, 6))
+    plt.imshow(img1, cmap='gray')
     plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20, label = 'keypoints')
     plt.xlabel('x (pixels)')
     plt.ylabel('y (pixels)')
     plt.title('Initialization Image 2 (frame %d)' % bootstrap_frames[1])
     plt.legend()
+    plt.savefig('initialization-plots/%s_initialization_img2_%s-%s_frames_detector_%s.png' % (config['dataset'], bootstrap_frames[0], bootstrap_frames[1], config['init_detector']))
     plt.show()
 
     # 3D plot of the initialization 3D landmarks (X)
@@ -124,34 +130,38 @@ if visualize:
 
     # triangulated 3D Points Visualization (z-axis) of the initialization
     plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
-    plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
-    plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
+    # plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
+    # plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
+    # plot the origin
+    plt.plot(0, 0, 'g.', label='Start Position')
+    plt.plot(pos[0], pos[2], 'r.', label='Next Position')
     plt.xlabel('X-axis')
     plt.ylabel('Z-axis')
     plt.ylim((0,50))
     plt.xlim((-15,15))
-    plt.title('triangulated 3D Points Visualization (z-axis) of the initialization')
+    plt.title('Pose Estimate and triangulated 3D landmarks of the initialization')
     plt.legend() # Show legend
+    plt.savefig('initialization-plots/%s_initialization_3Dlandmarks__%s-%s_frames_detector_%s.png' % (config['dataset'], bootstrap_frames[0], bootstrap_frames[1], config['init_detector']))
     plt.show() # Show the plot
 
     # plot all and filtered 2D keypoints (img 1)
-    plt.imshow(img1)
-    points = kps_1[filter, :]
-    print("size filtered points ", points.shape)
-    plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
-    plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
-    plt.title('filtered 2d keypoints image 1')
-    plt.plot()
-    plt.show()
+    # points = kps_1[filter, :]
+    # plt.imshow(img1)
+    # print("size filtered points ", points.shape)
+    # plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
+    # plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
+    # plt.title('filtered 2d keypoints image 1')
+    # plt.plot()
+    # plt.show()
 
     # plot all and filtered 2D keypoints (img 2)
-    plt.imshow(img1)
-    points2 = kps_2[filter,:]
-    plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
-    plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
-    plt.title('filtered 2d keypoints image 2')
-    plt.plot()
-    plt.show()
+    # points2 = kps_2[filter,:]
+    # plt.imshow(img1)
+    # plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
+    # plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
+    # plt.title('filtered 2d keypoints image 2')
+    # plt.plot()
+    # plt.show()
 
 
 ### - Continuous Operation
@@ -202,7 +212,7 @@ for img_idx in range(bootstrap_frames[1],final_frame): #was 3, 700
         print(f"len(state_2['P']): {len(new_state['P'])}")
 
     # estimate the pose of the new frame and update 
-    new_pose = pose_estimator.estimatePose(new_state) # T_world_newframe
+    new_pose = pose_estimator.estimatePose(new_state, img_idx) # T_world_newframe
     if debug:
         print(f"new_pose (T_world_newframe): {new_pose}")
     
@@ -242,7 +252,7 @@ for img_idx in range(bootstrap_frames[1],final_frame): #was 3, 700
         plt.plot(poses_plotting[:,0], poses_plotting[:,2], 'r-', label='Travelled Path')
 
         plt.legend() # Show legend
-        plt.savefig('plots/%s_trajectory_and_3Dlandmarks__%s-%s_frames_final_KLT_%s.png' % (config['dataset'], bootstrap_frames[0], img_idx, config['find_new_candidates_method']))
+        plt.savefig('trajectory-plots/%s_trajectory__%s_%s-%s_frames.png' % (config['dataset'], config['find_new_candidates_method'], bootstrap_frames[0], img_idx))
         plt.clf()
         print('New plot saved!')
 
@@ -269,7 +279,7 @@ plt.scatter(X_plotting[:,0], X_plotting[:,2], color='blue', marker='o', label='3
 plt.plot(poses_plotting[:,0], poses_plotting[:,2], 'r-', label='Travelled Path')
 
 plt.legend() # Show legend
-plt.savefig('plots/%s_trajectory_and_3Dlandmarks__%s-%s_frames_final_KLT_%s.png' % (config['dataset'], bootstrap_frames[0], final_frame, config['find_new_candidates_method']))
+plt.savefig('trajectory-plots/%s_trajectory__%s_%s-%s_frames.png' % (config['dataset'], config['find_new_candidates_method'], bootstrap_frames[0], img_idx))
 plt.show()
 
 

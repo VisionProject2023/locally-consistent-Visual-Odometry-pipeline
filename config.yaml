@@ -3,16 +3,24 @@
 dataset: 'kitti' # kitti-dataset, malaga or parking
 
 # find new candidates method
-find_new_candidates_method: 'sift-sift-des-compare' # 'shi-sift', 'sift-sift' or 'sift-sift-des-compare'
+find_new_candidates_method: 'shi-mask' # 'shi-mask', 'sift-mask' or 'sift-sift'
 
 # initialization parameters
-init_detector_descriptor: 'sift'
+init_detector: 'sift'
+init_descriptor: 'sift'
 
 # debug
 debug: False
 
 # visualization
-visualization: False
+visualization: True
+
+# parameters
+sift_alpha: 3
+shi_alpha: 1.5 # 1.5 worked well
+
+sift_ransac_confidence: 0.99999
+shi_ransac_confidence: 0.999993 # 0.999993 worked well (but no inliers around 600)
 
 
 
