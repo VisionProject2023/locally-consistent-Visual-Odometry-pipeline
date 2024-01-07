@@ -9,6 +9,7 @@ from visual import Visual
 
 debug = config['debug']
 visualize = config['visualization']
+visualize = False
 
 # Setup
 if config['dataset'] == 'kitti':
