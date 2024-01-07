@@ -158,6 +158,7 @@ extended_state['T'] = np.array([])
 sift = cv2.SIFT.create()
 _, old_des = sift.detectAndCompute(img1, None) # this should come from the initialization and we should start from img2
 
+visualization = False
 visual = Visual(K)
 #instantiate BestVision:
 vision = BestVision(K) 
@@ -246,10 +247,10 @@ for img_idx in range(2,2760): #was 3, 700
         plt.clf()
         print('New plot saved!')
 
-    idxs = np.arange(2, 4540, 100)
-    if img_idx in idxs:
-        filename = f"after_{img_idx}_iterations"
-        plt.savefig(filename)
+    # idxs = np.arange(2, 4540, 100)
+    # if img_idx in idxs:
+    #     filename = f"after_{img_idx}_iterations"
+    #     plt.savefig(filename)
 
     # Add new landmark triangulations to the state
     landmark_triangulator = LandmarkTriangulator(K, old_des)
@@ -269,8 +270,28 @@ for img_idx in range(2,2760): #was 3, 700
     img1 = img2
     old_des = cur_des
 
+idxs = np.arange(0,2000,250)
+intervals = []
+for idx in idxs:
+    intervals.append((idx,idx+500))
+intervals.append((2250,2760))
 
-plt.show()
+for interval in intervals:
+    plt.xlabel('X-axis')
+    plt.ylabel('Z-axis')
+    # plt.axis('square')
+    plt.title(f'Travelled Path and 3D Landmarks Visualization: from frame {interval[0]} to frame {interval[1]} KITTI')
+    # plot every 200 frames
+    # plot the 3D landmarks
+    plt.scatter(X_plotting[interval[0],interval[1]], X_plotting[interval[0],interval[1]], color='blue', marker='o', label='3D Landmarks')
+    # plot the ground truth path in green
+    # plt.plot(ground_truth[:,0], ground_truth[:,1], 'g-', label='Ground Truth')
+    # plot the travelled car path (positions) in red
+    plt.plot(poses_plotting[interval[0],interval[1]], poses_plotting[interval[0],interval[1]], 'r-', label='Travelled Path')
+    plt.legend() # Show legend
+    plt.savefig(f'KITTI DATASET: from frame {interval[0]} to frame {interval[1]}.png')
+    plt.clf()
+# plt.show()
 
     # if debug:
     #     print(f"vision.state: {vision.state}")

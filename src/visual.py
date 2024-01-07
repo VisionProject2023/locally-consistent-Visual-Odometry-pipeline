@@ -15,6 +15,7 @@ class Visual():
         self._landmarks = []
         self._landmarks_px = []
         self._position_history = []
+        self._number_of_keypoints = []
         self._tracked_px = []
         self._H_latest = np.eye(4)
         self._K = K
@@ -38,6 +39,7 @@ class Visual():
         self._landmarks_px.append(state['P'])
         self._landmarks = []
         self._landmarks.append(state['X'])
+        self._number_of_keypoints.append(state['X'].shape[0])
 
         # Store trajectory
         H = H
@@ -70,16 +72,23 @@ class Visual():
         # ax.plot(list(range(len(self._landmark_history))), self._landmark_history)
 
 
-        ax = self._fig.add_subplot(246)
+        ax = self._fig.add_subplot(245)
         traj_len = len(self._position_history)
         traj = np.vstack(self._position_history)
-        
-        ax = self._fig.add_subplot(245)
         plt.title("Local Trajectory")
         ax.scatter(traj[max([0, traj_len-20]):, 0], traj[max([0, traj_len-20]):, 2], s=20, c='blue', facecolor=None)
         ax.set_xlim(np.min(traj[max([0, traj_len-20]):,0]), np.max(traj[max([0, traj_len-20]):,0]))
         ax.set_ylim(np.min(traj[max([0, traj_len-20]):,2]), np.max(traj[max([0, traj_len-20]):,2]))
         ax.set_aspect("equal")
+        ax.set_adjustable("datalim")
+
+        ax = self._fig.add_subplot(246)
+        plt.title("Number_of_keypoints")
+        len_plot = min(len(self._number_of_keypoints), 20)
+        starting = len(self._number_of_keypoints) - len_plot
+        indices = np.arange(starting, len(self._number_of_keypoints), 1)
+        print("indices" ,indices)
+        ax.plot(indices, self._number_of_keypoints[starting:])
         ax.set_adjustable("datalim")
 
         # Draw trajectory
