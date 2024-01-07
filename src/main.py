@@ -9,6 +9,7 @@ from visual import Visual
 
 debug = config['debug']
 visualize = config['visualization']
+visualize = False
 
 # Setup
 if config['dataset'] == 'kitti':
@@ -174,8 +175,9 @@ extended_state['T'] = np.array([])
 sift = cv2.SIFT.create()
 _, old_des = sift.detectAndCompute(img1, None) # this should come from the initialization and we should start from img2
 
-visualization = False
-visual = Visual(K)
+visualization = True
+if visualization:
+    visual = Visual(K)
 #instantiate BestVision:
 vision = BestVision(K) 
 vision.state = state
@@ -266,8 +268,9 @@ for img_idx in range(bootstrap_frames[1],final_frame): #was 3, 700
     else:
         new_state, extended_state, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
     
-    visual.update(img2,new_state, new_pose)
-    visual.render()
+    if visualization:
+        visual.update(img2,new_state, new_pose)
+        visual.render()
     
     # update the state
     vision.state = new_state

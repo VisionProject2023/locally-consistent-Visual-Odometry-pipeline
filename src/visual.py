@@ -72,15 +72,19 @@ class Visual():
         # ax.plot(list(range(len(self._landmark_history))), self._landmark_history)
 
 
-        ax = self._fig.add_subplot(245)
+        ax = self._fig.add_subplot(122)
         traj_len = len(self._position_history)
         traj = np.vstack(self._position_history)
         plt.title("Local Trajectory")
         ax.scatter(traj[max([0, traj_len-20]):, 0], traj[max([0, traj_len-20]):, 2], s=20, c='blue', facecolor=None)
-        ax.set_xlim(np.min(traj[max([0, traj_len-20]):,0]), np.max(traj[max([0, traj_len-20]):,0]))
-        ax.set_ylim(np.min(traj[max([0, traj_len-20]):,2]), np.max(traj[max([0, traj_len-20]):,2]))
+        ax.set_xlim(1.5*np.min(traj[max([0, traj_len-20]):,0]), 1.5 * np.max(traj[max([0, traj_len-20]):,0]))
+        ax.set_ylim(1.5 * np.min(traj[max([0, traj_len-20]):,2]), 1.5 * np.max(traj[max([0, traj_len-20]):,2]))
         ax.set_aspect("equal")
         ax.set_adjustable("datalim")
+        # Draw landmarks in map
+        landmarks= np.array(self._landmarks[0])
+        filter = np.linalg.norm(landmarks, axis = 1) < 30
+        ax.scatter(landmarks[filter, 0], landmarks[filter, 2], s=20, c='green', facecolor=None, alpha=0.2)
 
         ax = self._fig.add_subplot(246)
         plt.title("Number_of_keypoints")
@@ -92,7 +96,7 @@ class Visual():
         ax.set_adjustable("datalim")
 
         # Draw trajectory
-        ax = self._fig.add_subplot(122)
+        ax = self._fig.add_subplot(245)
         plt.title("Global Trajectory")
         for axis in self._position_history:
             # print("axis ", axis)
@@ -101,12 +105,9 @@ class Visual():
         ax.set_adjustable("datalim")
         xlims = ax.get_xlim()
         ylims = ax.get_ylim()
-
-        # Draw landmarks in map
-        landmarks= np.array(self._landmarks[0])
-        ax.scatter(landmarks[:, 0], landmarks[:, 2], s=2, c='green', facecolor=None, alpha=0.05)
         ax.set_xlim(xlims)
         ax.set_ylim(ylims)
+
 
         self._fig.canvas.draw()
         im_vis = np.fromstring(self._fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
