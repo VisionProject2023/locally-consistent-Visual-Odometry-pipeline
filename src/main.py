@@ -171,8 +171,11 @@ associate = KeypointsToLandmarksAssociator(K, T_hom)
 pose_estimator = PoseEstimator(K)
 
 
-axis_list = []
-for img_idx in range(2,60): #was 3, 700
+# axis_list = []
+X_plotting = np.array([])
+poses_plotting = np.array([])
+final_frame = last_frame # if you want to adjust the end frame
+for img_idx in range(2,2760): #was 3, 700
     print(f"\n\n\n\n---------- IMG {img_idx} ----------")
     # loading the next image
     if config['dataset'] == 'kitti':
@@ -206,6 +209,11 @@ for img_idx in range(2,60): #was 3, 700
     pos_h = np.zeros(4)
     pos_h[3] = 1
     pos = (np.linalg.inv(new_pose) @ pos_h)[0:3]
+
+    # add the new pose to the plotting array
+    poses_plotting = np.vstack((poses_plotting, pos)) if poses_plotting.size else pos
+
+    # add the new 3D landmarks close <50 to the current position to the plotting aray
     X = vision.state['X']
     filter = np.linalg.norm(X - pos, axis = 1) < 50
     filter_add = np.linalg.norm(X - pos, axis = 1) > 3
@@ -213,18 +221,34 @@ for img_idx in range(2,60): #was 3, 700
     print("filter len ", filter.shape)
     print("X shape ", X.shape)
     X_filtered = X[filter,:]
-    plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
+    X_plotting = np.vstack((X_plotting, X_filtered)) if X_plotting.size else X_filtered
 
-    plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'b-')
-    plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'r-')
-    for ax in axis_list:
-        plt.plot([ax[0,3],ax[0,0]],[ax[2,3], ax[2,0]], 'b-')
-        plt.plot([ax[0,3],ax[0,2]],[ax[2,3], ax[2,2]], 'r-')
-    axis_list.append(axis)
+    # add the car path to the plotting array
     plt.xlabel('X-axis')
     plt.ylabel('Z-axis')
     # plt.axis('square')
-    plt.title('2D Points Visualization')
+    plt.title('Travelled Path and 3D Landmarks Visualization')
+
+    # plot every 200 frames
+    if img_idx % 200 == 0:
+        # plot the 3D landmarks
+        plt.scatter(X_plotting[:,0], X_plotting[:,2], color='blue', marker='o', label='3D Landmarks')
+
+        # plot the ground truth path in green
+        # plt.plot(ground_truth[:,0], ground_truth[:,1], 'g-', label='Ground Truth')
+
+        # plot the travelled car path (positions) in red
+        plt.plot(poses_plotting[:,0], poses_plotting[:,2], 'r-', label='Travelled Path')
+
+        plt.legend() # Show legend
+        plt.savefig(f'KITTI DATASET after {img_idx} frames.png')
+        plt.clf()
+        print('New plot saved!')
+
+    idxs = np.arange(2, 4540, 100)
+    if img_idx in idxs:
+        filename = f"after_{img_idx}_iterations"
+        plt.savefig(filename)
 
     # Add new landmark triangulations to the state
     landmark_triangulator = LandmarkTriangulator(K, old_des)
@@ -241,7 +265,8 @@ for img_idx in range(2,60): #was 3, 700
     vision.extended_state = extended_state
     img1 = img2
     old_des = cur_des
-    
+
+
 plt.show()
 
     # if debug:

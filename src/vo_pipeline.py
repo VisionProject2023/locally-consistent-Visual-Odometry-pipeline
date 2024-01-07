@@ -371,8 +371,11 @@ class PoseEstimator():
         self.K = K
 
         """ Constants """
-        self.REPOJ_THRESH = 2     # was 2, threshold on the reprojection error of points accepted as inliers
-        self.CONFIDENCE = 0.99999   # dsired confidence of result
+        self.REPOJ_THRESH = 2     # VALUE THAT GIVE THE BEST RESULT UNTIL NOW
+        self.CONFIDENCE = 0.99999   # VALUE THAT GIVE THE BEST RESULT UNTIL NOW
+
+        # self.REPOJ_THRESH = 3
+        # self.CONFIDENCE = 0.99
     
     def estimatePose(self, associations: Dict[np.ndarray,np.ndarray]) -> np.ndarray:
         '''
@@ -528,7 +531,7 @@ class LandmarkTriangulator():
 
         debug = False
         debug2 = False
-        print("\n\n---------- TRIANGULATE LANDMARK ----------")
+        # print("\n\n---------- TRIANGULATE LANDMARK ----------")
 
         # 1) Track and update the existing candidate keypoints (from frame to frame)
         candidate_keypoints_1 = extended_state['C'].astype(np.float32)
@@ -635,7 +638,8 @@ class LandmarkTriangulator():
 
 
         # VALIDATE NEW POINTS -> add them as keypoints for triangulation
-        treshold = 1
+        treshold = 1 # VALUE THAT GIVE THE BEST RESULT UNTIL NOW
+        # treshold = 1.5
         #debug
         alphas = []
         indices_to_validate = []
