@@ -115,7 +115,7 @@ class Visual():
         im_vis = cv2.cvtColor(im_vis, cv2.COLOR_RGB2BGR)
 
         
-        #cv2.imshow("Visualization", im_vis)
+        cv2.imshow("Visualization", im_vis)
         file_name = "images/image_" + str(self._iter)
-        plt.savefig(file_name)
+        #plt.savefig(file_name)
         plt.close(self._fig)

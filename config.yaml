@@ -14,8 +14,8 @@ init_descriptor: 'sift'
 debug: False
 
 # visualization
-visualization: True
-animation: True
+visualization: False
+animation: False
 
 # parameters for the sift-siftAf
 sift_alpha: 1 # 1 works well with KITTI, MALAGA and Parking
