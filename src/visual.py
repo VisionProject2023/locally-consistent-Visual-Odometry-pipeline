@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 class Visual():
 
-    def _init_(self, K):
+    def __init__(self, K):
         self._im = None
         self._landmarks = []
         self._landmarks_px = []

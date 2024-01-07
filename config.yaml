@@ -17,11 +17,12 @@ debug: False
 visualization: True
 animation: True
 
-# parameters
-sift_alpha: 1 # 1 works well with KITTI and Parking
-shi_alpha: 1.5 # 1.5 worked well with KITTI 
-
+# parameters for the sift-siftAf
+sift_alpha: 1 # 1 works well with KITTI, MALAGA and Parking
 sift_ransac_confidence: 0.99999
+
+# parameters for shi-mask:
+shi_alpha: 1.5 # 1.5 worked well with KITTI 
 shi_ransac_confidence: 0.999993 # 0.999993 worked well with KITTI (but no inliers around 600)
 
 
