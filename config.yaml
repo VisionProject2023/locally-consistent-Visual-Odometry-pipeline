@@ -1,6 +1,7 @@
 
 # dataset choise
-dataset: 'kitti' # kitti-dataset, malaga or parking
+dataset: 'parking' # kitti-dataset, malaga or parking
+
 
 # find new candidates method
 find_new_candidates_method: 'sift-sift' # 'shi-mask', 'sift-mask' or 'sift-sift'
@@ -14,6 +15,7 @@ debug: False
 
 # visualization
 visualization: True
+animation: False
 
 # parameters
 sift_alpha: 1

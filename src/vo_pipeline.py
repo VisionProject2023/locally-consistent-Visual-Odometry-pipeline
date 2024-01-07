@@ -43,21 +43,21 @@ class BestVision():
         self.state = {'P': np.ndarray, 'X': np.ndarray} # 'P' (keypoints), 'X' (3D landmarks)
         self.extended_state = {'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
-    def initialize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
-        '''
-        Initializes the state and returns the configuration of the second keyframe 
-        with respect to the first frame which configuration is considered as the world frame. This function makes the choice of which frame to use 
-        as second frame in initialization (for example the third frame in the sequence for th KITTY dataset as suggested)
+    # def initialize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
+    #     '''
+    #     Initializes the state and returns the configuration of the second keyframe 
+    #     with respect to the first frame which configuration is considered as the world frame. This function makes the choice of which frame to use 
+    #     as second frame in initialization (for example the third frame in the sequence for th KITTY dataset as suggested)
 
-        Inputs: 
-            frame_sequence: List[ HxW np.ndarray ] a list of all the frames (or just the first n)
+    #     Inputs: 
+    #         frame_sequence: List[ HxW np.ndarray ] a list of all the frames (or just the first n)
 
-        Outputs:
-            T: 4x4 np.ndarray representing pose (T = [R|t]])
-            S: dictionary with keypoints 'P' (keys) and 3D landmarks 'X' (values) 
-        ''' 
+    #     Outputs:
+    #         T: 4x4 np.ndarray representing pose (T = [R|t]])
+    #         S: dictionary with keypoints 'P' (keys) and 3D landmarks 'X' (values) 
+    #     ''' 
     
-        pass
+    #     pass
 
 class VOInitializer():
     
@@ -197,9 +197,8 @@ class VOInitializer():
         # state = {tuple(map(tuple, key)): value[:3]/value[3] for key, value in zip(zip(kps_1, kps_2), XH)} #add 3D points to the state, convert to euclidean coordinates, converts kps into tuples
         state['X'] = (XH[:,0:3].T / XH[:,3].T).T
         state['P'] = kps_1      
-        # -> feature to work on!
         
-        return state  #future improvement: try out .astype(np.float32)
+        return state  
 
 class KeypointsToLandmarksAssociator():
     def __init__(self, K, current_pose):
@@ -208,10 +207,7 @@ class KeypointsToLandmarksAssociator():
         '''
         self.K = K
         self.current_pose = current_pose
-        # in order to use the 1 point ransac I have to keep track of the last pose (pose of second frame 
-        # must be given in the init).
-        # current_pose is a Homo matrix that performs a change of basis from the first 
-        # camera's coordinate system to the second camera's coordinate system
+
 
     def associateKeypointsToLandmarks(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict) -> dict:
         '''
@@ -260,6 +256,7 @@ class KeypointsToLandmarksAssociator():
         # filter_total = np.logical_and(filter_u_max, filter_well_tracked)
         # filter_total = np.logical_and(filter_u_max, filter_total)
         # filter_total = np.logical_and(filter_v_max, filter_total)
+        
         keypoints_well_tracked = next_points[filter_well_tracked]
 
         landmarks_corresponding = state['X'][filter_well_tracked]
@@ -318,7 +315,6 @@ class KeypointsToLandmarksAssociator():
         # plt.title('move Visualization')
         # plt.legend() # Show legend
         # plt.show() # Show the plot
-
 
         # #I obtain a matrix from origin coordinates to current pose coordinate
         # proj_points, jacob = cv2.projectPoints(state_found_x, hom_inv[0:3,0:3], hom_inv[0:3,3], self.K, None)
@@ -460,9 +456,7 @@ class PoseEstimator():
         print("shape pos modifia ", associations['X'].shape)
         T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([[0,0,0,1]])], axis=0)
     
-        
         return T
-
 
 class LandmarkTriangulator():
     def __init__(self, K, old_des):
@@ -542,11 +536,6 @@ class LandmarkTriangulator():
         mask = np.isin(keypoints, old_keypoints, invert=True).all(axis=1)
         new_keypoints = keypoints[mask]
         
-        # # divide the keypoints into new ones and already existing ones
-        # if len(extended_state['C']) > 0:
-        #     known_points = np.concatenate((state['P'], extended_state['C']), axis=0)
-        # else:
-        #     known_points = state['P']
 
         # if debug:
         #     print("\n---- FIND NEW CANDIDATES ----")

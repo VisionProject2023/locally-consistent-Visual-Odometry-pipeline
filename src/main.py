@@ -38,7 +38,7 @@ elif config['dataset'] == 'malaga':
                   [0, 621.18428, 309.05989],
                   [0, 0, 1]])
     
-    bootstrap_frames = [0, 2]
+    bootstrap_frames = [0, 4]
     img0 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[0]]}', cv2.IMREAD_GRAYSCALE)
     img1 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[1]]}', cv2.IMREAD_GRAYSCALE)
     
@@ -164,7 +164,6 @@ if visualize:
     # plt.plot()
     # plt.show()
 
-
 ### - Continuous Operation
 extended_state = {}
 extended_state['C'] = np.array([])
@@ -175,7 +174,11 @@ sift = cv2.SIFT.create()
 _, old_des = sift.detectAndCompute(img1, None) # this should come from the initialization and we should start from img2
 
 visualization = False
-visual = Visual(K)
+
+# instantiate the animation visualizer
+if config['animation'] == True:
+    visual = Visual(K)
+
 #instantiate BestVision:
 vision = BestVision(K) 
 vision.state = state
@@ -266,8 +269,9 @@ for img_idx in range(bootstrap_frames[1],final_frame): #was 3, 700
     else:
         new_state, extended_state, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
     
-    visual.update(img2,new_state, new_pose)
-    visual.render()
+    if config['animation'] == True:
+        visual.update(img2,new_state, new_pose)
+        visual.render()
     
     # update the state
     vision.state = new_state
