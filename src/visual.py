@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 class Visual():
 
-    def __init__(self, K):
+    def _init_(self, K):
         self._im = None
         self._landmarks = []
         self._landmarks_px = []
@@ -52,14 +52,16 @@ class Visual():
 
 
     def render(self):
-        self._fig = plt.figure(figsize=(24, 12))
+        self._fig = plt.figure(figsize=(12, 6))
+        landmarks= np.array(self._landmarks[0])
+        filter = np.linalg.norm(landmarks, axis = 1) < 200
         ax = self._fig.add_subplot(221)
         plt.title("Landmarks and Keypoints img {}".format(self._iter))
         ax.imshow(self._im)
 
         # Draw keypoints
         landmarks_px = np.array(self._landmarks_px[0])
-        ax.scatter(landmarks_px[:, 0], landmarks_px[:, 1], s=4, c='green', facecolor=None)
+        ax.scatter(landmarks_px[filter, 0], landmarks_px[filter, 1], s=4, c='green', facecolor=None)
         ax.set_xlim([0, self._im.shape[1]])
         ax.set_ylim([self._im.shape[0], 0])
         ax.legend(["Landmarks"], loc='lower right')
@@ -77,13 +79,11 @@ class Visual():
         traj = np.vstack(self._position_history)
         plt.title("Local Trajectory")
         ax.scatter(traj[max([0, traj_len-20]):, 0], traj[max([0, traj_len-20]):, 2], s=20, c='blue', facecolor=None)
-        ax.set_xlim(1.5*np.min(traj[max([0, traj_len-20]):,0]), 1.5 * np.max(traj[max([0, traj_len-20]):,0]))
-        ax.set_ylim(1.5 * np.min(traj[max([0, traj_len-20]):,2]), 1.5 * np.max(traj[max([0, traj_len-20]):,2]))
+        ax.set_xlim(np.min(traj[max([0, traj_len-20]):,0]) -2, np.max(traj[max([0, traj_len-20]):,0]) + 2)
+        ax.set_ylim(np.min(traj[max([0, traj_len-20]):,2]) -2, np.max(traj[max([0, traj_len-20]):,2]) + 2)
         ax.set_aspect("equal")
         ax.set_adjustable("datalim")
         # Draw landmarks in map
-        landmarks= np.array(self._landmarks[0])
-        filter = np.linalg.norm(landmarks, axis = 1) < 30
         ax.scatter(landmarks[filter, 0], landmarks[filter, 2], s=20, c='green', facecolor=None, alpha=0.2)
 
         ax = self._fig.add_subplot(246)
@@ -115,5 +115,7 @@ class Visual():
         im_vis = cv2.cvtColor(im_vis, cv2.COLOR_RGB2BGR)
 
         
-        cv2.imshow("Visualization", im_vis)
-        plt.close( self._fig )
+        #cv2.imshow("Visualization", im_vis)
+        file_name = "images/image_" + str(self._iter)
+        plt.savefig(file_name)
+        plt.close(self._fig)

@@ -412,7 +412,7 @@ class PoseEstimator():
                 
             elif config['dataset'] == 'malaga':
                 malaga_path = 'malaga-urban-dataset-extract-07'  # replace with your path
-                left_images = [img for img in os.listdir(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images') if img.endswith('.jpg')]
+                left_images = [img for img in os.listdir(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images') if img.endswith('left.jpg')]
                 left_images.sort()
                 cur_frame = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[img_idx]}', cv2.IMREAD_GRAYSCALE)
                 next_bootstrap_frame = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[img_idx+4]}', cv2.IMREAD_GRAYSCALE)
@@ -445,7 +445,6 @@ class PoseEstimator():
             # add the keypoints of the current frame (kps_1) to the associations
             associations['P'] = np.vstack((associations['P'], kps_1))
             return self.estimatePose(associations, img_idx)
-            
             
 
         inliers = np.hstack(inliers)

@@ -1,6 +1,6 @@
 
 # dataset choise
-dataset: 'parking' # kitti-dataset, malaga or parking
+dataset: 'malaga' # kitti, malaga or parking
 
 
 # find new candidates method
@@ -15,14 +15,15 @@ debug: False
 
 # visualization
 visualization: True
-animation: False
+animation: True
 
 # parameters
-sift_alpha: 1
-shi_alpha: 1.5 # 1.5 worked well
+sift_alpha: 1 # 1 works well with KITTI and Parking
+shi_alpha: 1.5 # 1.5 worked well with KITTI 
 
 sift_ransac_confidence: 0.99999
-shi_ransac_confidence: 0.999993 # 0.999993 worked well (but no inliers around 600)
+shi_ransac_confidence: 0.999993 # 0.999993 worked well with KITTI (but no inliers around 600)
+
 
 # parameters for locally consistent sift-sift:
 # sift_alpha: 1

@@ -9,21 +9,22 @@ from visual import Visual
 
 debug = config['debug']
 visualize = config['visualization']
-visualize = False
 
 # Setup
 if config['dataset'] == 'kitti':
     # Set kitti_path to the folder containing "05" and "poses"
     kitti_path = 'kitti-dataset'  # replace with your path
     assert os.path.exists(kitti_path), "KITTI path does not exist"
-    ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')[:, -9:-7]
-    kitti_images = [img for img in os.listdir(f'{kitti_path}/05/image_0') if img.endswith('.png')]
+    ground_truth = np.loadtxt(f'{kitti_path}/poses/05.txt')
+    gtx = ground_truth[:, 3]
+    gtz = ground_truth[:, -1]
+    kitti_images = [img for img in os.listdir(f'{kitti_path}/05/image_0') if img.endswith('left.png')]
     last_frame = len(kitti_images) - 1 
     K = np.array([[718.856, 0, 607.1928],
                   [0, 718.856, 185.2157],
                   [0, 0, 1]])
     
-    bootstrap_frames = [0,6] # [0,6]
+    bootstrap_frames = [0,6]
     img0 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[0]:06d}.png', cv2.IMREAD_GRAYSCALE)
     img1 = cv2.imread(f'{kitti_path}/05/image_0/{bootstrap_frames[1]:06d}.png', cv2.IMREAD_GRAYSCALE)
 
@@ -31,15 +32,17 @@ elif config['dataset'] == 'malaga':
     # Set malaga_path to the folder containing Malaga dataset
     malaga_path = 'malaga-urban-dataset-extract-07'  # replace with your path
     assert os.path.exists(malaga_path), "Malaga path does not exist"
-    #ground_truth = np.loadtxt(f'{malaga_path}/poses/05.txt')[:, -9:-7]
-    left_images = [img for img in os.listdir(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images') if img.endswith('.jpg')]
+    ground_truth = np.loadtxt(f'{malaga_path}/malaga-urban-dataset-extract-07_all-sensors_GPS.txt')
+    gtx = ground_truth[:, 8] #[:, 8]
+    gtz = ground_truth[:, 9] #[:, 9]
+    left_images = [img for img in os.listdir(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images') if img.endswith('left.jpg')]
     left_images.sort()
     last_frame = len(left_images) -1 
     K = np.array([[621.18428, 0, 404.0076],
                   [0, 621.18428, 309.05989],
                   [0, 0, 1]])
     
-    bootstrap_frames = [0, 4]
+    bootstrap_frames = [0, 6]
     img0 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[0]]}', cv2.IMREAD_GRAYSCALE)
     img1 = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[bootstrap_frames[1]]}', cv2.IMREAD_GRAYSCALE)
     
@@ -53,9 +56,11 @@ elif config['dataset'] == 'parking':
                 [0, 369.568, 240],
                 [0, 0, 1]])
     
-    ground_truth = np.loadtxt(f'{parking_path}/poses.txt')[:, -9:-7]
+    ground_truth = np.loadtxt(f'{parking_path}/poses.txt')
+    gtx = ground_truth[:, 3]
+    gtz = ground_truth[:, -1]
     
-    bootstrap_frames = [0, 2]
+    bootstrap_frames = [0, 4]
     img0 = cv2.imread(f'{parking_path}/images/img_{bootstrap_frames[0]:05d}.png', cv2.IMREAD_GRAYSCALE)
     img1 = cv2.imread(f'{parking_path}/images/img_{bootstrap_frames[1]:05d}.png', cv2.IMREAD_GRAYSCALE)
 
@@ -146,6 +151,19 @@ if visualize:
     plt.savefig('initialization-plots/%s_initialization_3Dlandmarks__%s-%s_frames_detector_%s.png' % (config['dataset'], bootstrap_frames[0], bootstrap_frames[1], config['init_detector']))
     plt.show() # Show the plot
 
+    # plot the ground truth trajectories of the dataset in green 
+    plt.xlabel('X-axis')
+    plt.ylabel('Z-axis')
+    # plt.title(f'Ground Truth Trajectory {config["dataset"]}')
+    # plot the ground truth path in green
+    plt.plot(gtx, gtz, 'g-', label='Ground Truth')
+    # plot the origin
+    plt.plot(0, 0, 'r.', label='Start Position')
+    plt.savefig(f'ground_truth_trajectory_{config["dataset"]}.png')
+    plt.legend() # Show legend
+    plt.show()
+
+
     # plot all and filtered 2D keypoints (img 1)
     # points = kps_1[filter, :]
     # plt.imshow(img1)
@@ -174,7 +192,7 @@ extended_state['T'] = np.array([])
 sift = cv2.SIFT.create()
 _, old_des = sift.detectAndCompute(img1, None) # this should come from the initialization and we should start from img2
 
-visualization = False
+# visualization = False
 
 # instantiate the animation visualizer
 if config['animation'] == True:
@@ -293,6 +311,8 @@ plt.legend() # Show legend
 plt.savefig('trajectory-plots/%s_trajectory__%s_%s-%s_frames.png' % (config['dataset'], config['find_new_candidates_method'], bootstrap_frames[0], img_idx))
 plt.show()
 
+
+
 # idxs = np.arange(0,2000,250)
 # intervals = []
 # for idx in idxs:
@@ -315,6 +335,8 @@ plt.show()
 #     plt.savefig(f'KITTI DATASET: from frame {interval[0]} to frame {interval[1]}.png')
 #     plt.clf()
 # # plt.show()
+
+
 
 
 #%%
