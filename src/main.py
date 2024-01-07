@@ -98,7 +98,7 @@ X_filtered = state['X'][filter,:]
     
 if visualize:
     # plot the initialization images
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 3.5))
     plt.imshow(img0, cmap='gray')
     plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20, label = 'keypoints')
     plt.xlabel('x (pixels)')
@@ -108,7 +108,7 @@ if visualize:
     plt.savefig('initialization-plots/%s_initialization_img1_%s-%s_frames_detector_%s.png' % (config['dataset'], bootstrap_frames[0], bootstrap_frames[1], config['init_detector']))
     plt.show()
 
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(10, 3.5))
     plt.imshow(img1, cmap='gray')
     plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20, label = 'keypoints')
     plt.xlabel('x (pixels)')

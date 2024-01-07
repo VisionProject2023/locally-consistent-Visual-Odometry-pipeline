@@ -59,21 +59,10 @@ class BestVision():
     
         pass
     
-    def update_state(self, P: np.ndarray, X: np.ndarray):
-        self.state['P'] = P
-        self.state['X'] = X
+    # def update_state(self, P: np.ndarray, X: np.ndarray):
+    #     self.state['P'] = P
+    #     self.state['X'] = X
 
-    def processFrame(new_frame: np.ndarray) -> np.ndarray:
-        '''
-        Takes as input a new frame and computes the pose of this frame. It also updates the stored 3D landmarks.
-
-        Inputs:
-            new_frame: HxW np.ndarray
-
-        Outputs:
-            T: 4x4 np.ndarray which encodes the new pose with respect to the world frame
-        '''
-        pass
     
 
 class VOInitializer():
@@ -652,10 +641,11 @@ class LandmarkTriangulator():
                 print(f"candidate_keypoints_1_well_tracked: {candidate_keypoints_1_well_tracked}")
 
             # Create a boolean mask to identify the positions of the tracked candidate keypoints to be updated
-            mask = np.isin(candidate_keypoints_2, candidate_keypoints_2_well_tracked).all(axis=1)
-            extended_state['C'][mask] = candidate_keypoints_2_well_tracked 
-            # mask = np.isin(extended_state['C'], candidate_keypoints_1_well_tracked).all(axis=1)
-            # extended_state['C'][mask] = candidate_keypoints_2_well_tracked # Update all the candidate keypoints that have been retracked
+            if config['find_new_candidates_method'] == 'shi-mask':
+                mask = np.isin(candidate_keypoints_2, candidate_keypoints_2_well_tracked).all(axis=1)
+            if config['find_new_candidates_method'] == 'sift-sift':
+                mask = np.isin(extended_state['C'], candidate_keypoints_1_well_tracked).all(axis=1)
+            extended_state['C'][mask] = candidate_keypoints_2_well_tracked # Update all the candidate keypoints that have been retracked
 
             len_ckC_step3 = len(extended_state['C'])
             if debug:
