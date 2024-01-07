@@ -58,12 +58,6 @@ class BestVision():
         ''' 
     
         pass
-    
-    # def update_state(self, P: np.ndarray, X: np.ndarray):
-    #     self.state['P'] = P
-    #     self.state['X'] = X
-
-    
 
 class VOInitializer():
     
@@ -124,12 +118,6 @@ class VOInitializer():
             kps_f1 = sift.detect(frame1, None)
             kps_f2 = sift.detect(frame2, None)
             
-            # Convert keypoints to cv2.KeyPoint format
-        
-            # kps_f1 = [cv2.KeyPoint(x=pt[0][0], y=pt[0][1], size=20) for pt in kps_f1]
-            # kps_f2 = [cv2.KeyPoint(x=pt[0][0], y=pt[0][1], size=20) for pt in kps_f2]
-            
-            # kps_f1 = np.array([kp.pt for kp in kps_f1])
             
         if config['init_descriptor'] == 'sift':
         
@@ -212,7 +200,6 @@ class VOInitializer():
         # -> feature to work on!
         
         return state  #future improvement: try out .astype(np.float32)
-
 
 class KeypointsToLandmarksAssociator():
     def __init__(self, K, current_pose):
@@ -405,7 +392,6 @@ class PoseEstimator():
             # there need to be more keypoints to estimate the pose accurately
             # add brand new landmarks and keypoints to the state -> initialization
             
-            
             # instantiate the VOInitializer
             VOInit = VOInitializer(self.K)
 
@@ -453,10 +439,6 @@ class PoseEstimator():
             return self.estimatePose(associations, img_idx)
             
             
-            
-            # if self.REPOJ_THRESH < 3:
-            #     self.REPOJ_THRESH += 0.5
-            #     self.estimatePose(associations)
 
         inliers = np.hstack(inliers)
         print(inliers[0:10])
@@ -466,13 +448,6 @@ class PoseEstimator():
         print("shape pos modifia ", associations['X'].shape)
         T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([[0,0,0,1]])], axis=0)
     
-        
-        # if inliers is None:
-        #     print('Error: no inliers found! T can not be calculated, increasing the threshold')
-            # if self.REPOJ_THRESH < 3:
-            #     self.REPOJ_THRESH += 0.5
-            #     # run the function again
-            #     self.estimatePose(associations)
         
         return T
 
