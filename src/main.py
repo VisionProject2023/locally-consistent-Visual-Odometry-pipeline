@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from vo_pipeline import *
+from visual import Visual
 
 debug = config['debug']
 visualize = config['visualization']
@@ -86,66 +87,66 @@ print("X shape ", state['X'].shape)
 X_filtered = state['X'][filter,:]
 
     
-if visualize:
-    # plot the initialization images
-    plt.figure(figsize=(10, 10))
-    plt.imshow(img0, cmap='gray')
-    plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20, label = 'keypoints')
-    plt.xlabel('x (pixels)')
-    plt.ylabel('y (pixels)')
-    plt.title('Initialization Image 1 (frame %d)' % bootstrap_frames[0])
-    plt.legend()
-    plt.show()
+# if visualize:
+#     # plot the initialization images
+#     plt.figure(figsize=(10, 10))
+#     plt.imshow(img0, cmap='gray')
+#     plt.scatter(kps_1[:, 0], kps_1[:, 1], c='r', s=20, label = 'keypoints')
+#     plt.xlabel('x (pixels)')
+#     plt.ylabel('y (pixels)')
+#     plt.title('Initialization Image 1 (frame %d)' % bootstrap_frames[0])
+#     plt.legend()
+#     plt.show()
 
-    plt.figure(figsize=(10, 10))
-    plt.imshow(img0, cmap='gray')
-    plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20, label = 'keypoints')
-    plt.xlabel('x (pixels)')
-    plt.ylabel('y (pixels)')
-    plt.title('Initialization Image 2 (frame %d)' % bootstrap_frames[1])
-    plt.legend()
-    plt.show()
+#     plt.figure(figsize=(10, 10))
+#     plt.imshow(img0, cmap='gray')
+#     plt.scatter(kps_2[:, 0], kps_2[:, 1], c='r', s=20, label = 'keypoints')
+#     plt.xlabel('x (pixels)')
+#     plt.ylabel('y (pixels)')
+#     plt.title('Initialization Image 2 (frame %d)' % bootstrap_frames[1])
+#     plt.legend()
+#     plt.show()
 
-    # 3D plot of the initialization 3D landmarks (X)
-    # fig = plt.figure(figsize=(10, 10))
-    # ax = fig.add_subplot(111, projection='3d')
-    # ax.scatter(X[:, 0], X[:, 1], X[:, 2], c='r', s=20)
-    # ax.set_xlabel('x (m)')
-    # ax.set_ylabel('y (m)')
-    # ax.set_zlabel('z (m)')
-    # ax.set_title('3D landmarks (X)')
-    # plt.show()
+#     # 3D plot of the initialization 3D landmarks (X)
+#     # fig = plt.figure(figsize=(10, 10))
+#     # ax = fig.add_subplot(111, projection='3d')
+#     # ax.scatter(X[:, 0], X[:, 1], X[:, 2], c='r', s=20)
+#     # ax.set_xlabel('x (m)')
+#     # ax.set_ylabel('y (m)')
+#     # ax.set_zlabel('z (m)')
+#     # ax.set_title('3D landmarks (X)')
+#     # plt.show()
 
-    # triangulated 3D Points Visualization (z-axis) of the initialization
-    plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
-    plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
-    plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
-    plt.xlabel('X-axis')
-    plt.ylabel('Z-axis')
-    plt.ylim((0,50))
-    plt.xlim((-15,15))
-    plt.title('triangulated 3D Points Visualization (z-axis) of the initialization')
-    plt.legend() # Show legend
-    plt.show() # Show the plot
+#     # triangulated 3D Points Visualization (z-axis) of the initialization
+#     plt.scatter(X_filtered[:,0], X_filtered[:,2], color='blue', marker='o', label='Points')
+#     plt.plot([axis[0,3],axis[0,0]],[axis[2,3], axis[2,0]], 'r-')
+#     plt.plot([axis[0,3],axis[0,2]],[axis[2,3], axis[2,2]], 'g-')
+#     plt.xlabel('X-axis')
+#     plt.ylabel('Z-axis')
+#     plt.ylim((0,50))
+#     plt.xlim((-15,15))
+#     plt.title('triangulated 3D Points Visualization (z-axis) of the initialization')
+#     plt.legend() # Show legend
+#     plt.show() # Show the plot
 
-    # plot all and filtered 2D keypoints (img 1)
-    plt.imshow(img1)
-    points = kps_1[filter, :]
-    print("size filtered points ", points.shape)
-    plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
-    plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
-    plt.title('filtered 2d keypoints image 1')
-    plt.plot()
-    plt.show()
+#     # plot all and filtered 2D keypoints (img 1)
+#     plt.imshow(img1)
+#     points = kps_1[filter, :]
+#     print("size filtered points ", points.shape)
+#     plt.scatter(kps_1[:,0], kps_1[:,1], color='blue', marker='o', label='All keypoints')
+#     plt.scatter(points[:,0], points[:,1], color='red', marker='o', label='Filtered keypoints')
+#     plt.title('filtered 2d keypoints image 1')
+#     plt.plot()
+#     plt.show()
 
-    # plot all and filtered 2D keypoints (img 2)
-    plt.imshow(img1)
-    points2 = kps_2[filter,:]
-    plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
-    plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
-    plt.title('filtered 2d keypoints image 2')
-    plt.plot()
-    plt.show()
+#     # plot all and filtered 2D keypoints (img 2)
+#     plt.imshow(img1)
+#     points2 = kps_2[filter,:]
+#     plt.scatter(kps_2[:,0], kps_2[:,1], color='blue', marker='o', label='All keypoints')
+#     plt.scatter(points2[:,0], points2[:,1], color='red', marker='o', label='Filtered keypoints')
+#     plt.title('filtered 2d keypoints image 2')
+#     plt.plot()
+#     plt.show()
 
 
 ### - Continuous Operation
@@ -157,7 +158,7 @@ extended_state['T'] = np.array([])
 sift = cv2.SIFT.create()
 _, old_des = sift.detectAndCompute(img1, None) # this should come from the initialization and we should start from img2
 
-
+visual = Visual(K)
 #instantiate BestVision:
 vision = BestVision(K) 
 vision.state = state
@@ -253,6 +254,8 @@ for img_idx in range(2,2760): #was 3, 700
     # Add new landmark triangulations to the state
     landmark_triangulator = LandmarkTriangulator(K, old_des)
     new_state, extended_state, cur_des = landmark_triangulator.triangulate_landmark(img1, img2, new_state, extended_state, new_pose)
+    visual.update(img2,new_state, new_pose)
+    visual.render()
     
     # was new_state, extended_state, cur_des
     

@@ -259,18 +259,30 @@ class KeypointsToLandmarksAssociator():
               status -> vector with 1 if corresponding feature has been found, 0 if not
               error -> output vector of errors
         '''
-        
+
         state['P'] = state['P'].astype(np.float32)
-        keypoints, status, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, state['P'], None)
+        next_points, status, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, state['P'], None)
         filter_well_tracked = np.hstack(status).astype(np.bool_)
-        
         filter_tracking_lost = np.logical_not(filter_well_tracked)
-        points_tracking_lost = keypoints[filter_tracking_lost]
-        
-        # tracked keypoints
-        keypoints_well_tracked = keypoints[filter_well_tracked]
-        
-        # associate the tracked keypoint to the same 3D landmark
+        points_tracking_lost = next_points[filter_tracking_lost]
+        #calculate reprojection error -------------
+        # points_reprojected, state2, err2 = cv2.calcOpticalFlowPyrLK(new_frame, old_frame, next_points, None)
+        # d = np.linalg.norm(state['P'] - points_reprojected, axis = 1)
+        # reproj_threshold = 30
+        # filter_reproj = d < reproj_threshold
+        #filter based on the image shape
+        # filter_u_min = (next_points[:,0] > 0)
+        # filter_u_max = (next_points[:,0]< new_frame.shape[0])
+        # filter_u_max = np.logical_and(filter_u_min, filter_u_max)
+        # filter_v_min = (next_points[:,1] > 0)
+        # filter_v_max = (next_points[:,1] < new_frame.shape[1])
+        # filter_v_max = np.logical_and(filter_v_min, filter_v_max)
+        #filter based on the status
+        # filter_total = np.logical_and(filter_u_max, filter_well_tracked)
+        # filter_total = np.logical_and(filter_u_max, filter_total)
+        # filter_total = np.logical_and(filter_v_max, filter_total)
+        keypoints_well_tracked = next_points[filter_well_tracked]
+
         landmarks_corresponding = state['X'][filter_well_tracked]
         
         # define the new state
@@ -374,7 +386,7 @@ class PoseEstimator():
         self.REPOJ_THRESH = 2     # VALUE THAT GIVE THE BEST RESULT UNTIL NOW
         self.CONFIDENCE = 0.99999   # VALUE THAT GIVE THE BEST RESULT UNTIL NOW
 
-        # self.REPOJ_THRESH = 3
+        # self.REPOJ_THRESH = 2
         # self.CONFIDENCE = 0.99
     
     def estimatePose(self, associations: Dict[np.ndarray,np.ndarray]) -> np.ndarray:
