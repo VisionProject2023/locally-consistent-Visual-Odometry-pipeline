@@ -582,7 +582,7 @@ class LandmarkTriangulator():
 
         debug = False
         debug2 = False
-        print("\n\n---------- TRIANGULATE LANDMARK ----------")
+        # print("\n\n---------- TRIANGULATE LANDMARK ----------")
 
         # 1) Track and update the existing candidate keypoints (from frame to frame)
         candidate_keypoints_1 = extended_state['C'].astype(np.float32)
@@ -704,7 +704,7 @@ class LandmarkTriangulator():
 
 
         # 3) validate new points (when the baseline is big enough to produce accurate triangulation) (from candidate keypoints to real keypoints used for triangulation)
-        treshold = 1.5
+        treshold = 1
         if config['find_new_candidates_method'] == 'sift-sift':
             treshold = config['sift_alpha']
         if config['find_new_candidates_method'] == 'shi-mask':
