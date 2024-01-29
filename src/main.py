@@ -112,7 +112,7 @@ if visualize:
     plt.ylabel('y (pixels)')
     plt.title('Initialization Image 1 (frame %d)' % bootstrap_frames[0])
     plt.legend()
-    plt.savefig('initialization-plots/%s_initialization_img1_%s-%s_frames_detector_%s.png' % (config['dataset'], bootstrap_frames[0], bootstrap_frames[1], config['init_detector']))
+    plt.savefig('initialization-plots-and-figures/%s_initialization_img1_%s-%s_frames_detector_%s.png' % (config['dataset'], bootstrap_frames[0], bootstrap_frames[1], config['init_detector']))
     plt.show()
 
     plt.figure(figsize=(10, 3.5))
@@ -122,7 +122,7 @@ if visualize:
     plt.ylabel('y (pixels)')
     plt.title('Initialization Image 2 (frame %d)' % bootstrap_frames[1])
     plt.legend()
-    plt.savefig('initialization-plots/%s_initialization_img2_%s-%s_frames_detector_%s.png' % (config['dataset'], bootstrap_frames[0], bootstrap_frames[1], config['init_detector']))
+    plt.savefig('initialization-plots-and-figures/%s_initialization_img2_%s-%s_frames_detector_%s.png' % (config['dataset'], bootstrap_frames[0], bootstrap_frames[1], config['init_detector']))
     plt.show()
 
 #     # 3D plot of the initialization 3D landmarks (X)
@@ -148,7 +148,7 @@ if visualize:
     plt.xlim((-15,15))
     plt.title('Pose Estimate and triangulated 3D landmarks of the initialization')
     plt.legend() # Show legend
-    plt.savefig('initialization-plots/%s_initialization_3Dlandmarks__%s-%s_frames_detector_%s.png' % (config['dataset'], bootstrap_frames[0], bootstrap_frames[1], config['init_detector']))
+    plt.savefig('initialization-plots-and-figures/%s_initialization_3Dlandmarks__%s-%s_frames_detector_%s.png' % (config['dataset'], bootstrap_frames[0], bootstrap_frames[1], config['init_detector']))
     plt.show() # Show the plot
 
     # plot the ground truth trajectories of the dataset in green 
@@ -159,10 +159,9 @@ if visualize:
     plt.plot(gtx, gtz, 'g-', label='Ground Truth')
     # plot the origin
     plt.plot(0, 0, 'r.', label='Start Position')
-    plt.savefig(f'ground_truth_trajectory_{config["dataset"]}.png')
+    plt.savefig(f'ground-truth-trajectories/ground_truth_trajectory_{config["dataset"]}.png')
     plt.legend() # Show legend
     plt.show()
-
 
     # plot all and filtered 2D keypoints (img 1)
     # points = kps_1[filter, :]
@@ -192,8 +191,6 @@ extended_state['T'] = np.array([])
 sift = cv2.SIFT.create()
 _, old_des = sift.detectAndCompute(img1, None) # this should come from the initialization and we should start from img2
 
-# visualization = False
-
 # instantiate the animation visualizer
 if config['animation'] == True:
     visual = Visual(K)
@@ -209,7 +206,6 @@ if debug:
     
 associate = KeypointsToLandmarksAssociator(K, T_hom)
 pose_estimator = PoseEstimator(K)
-
 
 #axis_list = []
 X_plotting = np.array([])
@@ -277,7 +273,7 @@ for img_idx in range(bootstrap_frames[1],final_frame): #was 3, 700
         plt.plot(poses_plotting[:,0], poses_plotting[:,2], 'r-', label='Travelled Path')
 
         plt.legend() # Show legend
-        plt.savefig('trajectory-plots/%s_trajectory__%s_%s-%s_frames.png' % (config['dataset'], config['find_new_candidates_method'], bootstrap_frames[0], img_idx))
+        plt.savefig('result-trajectory-plots/%s_trajectory__%s_%s-%s_frames.png' % (config['dataset'], config['find_new_candidates_method'], bootstrap_frames[0], img_idx))
         plt.clf()
         print('New plot saved!')
 
@@ -308,34 +304,8 @@ plt.scatter(X_plotting[:,0], X_plotting[:,2], color='blue', marker='o', label='3
 plt.plot(poses_plotting[:,0], poses_plotting[:,2], 'r-', label='Travelled Path')
 
 plt.legend() # Show legend
-plt.savefig('trajectory-plots/%s_trajectory__%s_%s-%s_frames.png' % (config['dataset'], config['find_new_candidates_method'], bootstrap_frames[0], img_idx))
+plt.savefig('result-trajectory-plots/%s_trajectory__%s_%s-%s_frames.png' % (config['dataset'], config['find_new_candidates_method'], bootstrap_frames[0], img_idx))
 plt.show()
-
-
-
-# idxs = np.arange(0,2000,250)
-# intervals = []
-# for idx in idxs:
-#     intervals.append((idx,idx+500))
-# intervals.append((2250,2760))
-
-# for interval in intervals:
-#     plt.xlabel('X-axis')
-#     plt.ylabel('Z-axis')
-#     # plt.axis('square')
-#     plt.title(f'Travelled Path and 3D Landmarks Visualization: from frame {interval[0]} to frame {interval[1]} KITTI')
-#     # plot every 200 frames
-#     # plot the 3D landmarks
-#     plt.scatter(X_plotting[interval[0],interval[1]], X_plotting[interval[0],interval[1]], color='blue', marker='o', label='3D Landmarks')
-#     # plot the ground truth path in green
-#     # plt.plot(ground_truth[:,0], ground_truth[:,1], 'g-', label='Ground Truth')
-#     # plot the travelled car path (positions) in red
-#     plt.plot(poses_plotting[interval[0],interval[1]], poses_plotting[interval[0],interval[1]], 'r-', label='Travelled Path')
-#     plt.legend() # Show legend
-#     plt.savefig(f'KITTI DATASET: from frame {interval[0]} to frame {interval[1]}.png')
-#     plt.clf()
-# # plt.show()
-
 
 
 
