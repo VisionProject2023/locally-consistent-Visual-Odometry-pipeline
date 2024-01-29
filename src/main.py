@@ -68,7 +68,6 @@ else:
     raise ValueError("Invalid dataset selection")
 
 
-
 # instantiate the VOInitializer
 VOInit = VOInitializer(K)
 
@@ -182,7 +181,7 @@ if visualize:
     # plt.plot()
     # plt.show()
 
-### - Continuous Operation
+### 2 - Continuous Operation
 extended_state = {}
 extended_state['C'] = np.array([])
 extended_state['F'] = np.array([])

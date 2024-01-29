@@ -1,63 +1,61 @@
 # BestVision
+In this repository, a locally consistent VO pipeline is built, implemented as a Markovian, asynchronous architecture.
+This project was completed as part of the Vision Algorithms for Mobile Robotics Course from Prof. Davide Scaramuzza at ETHZ and UZH (https://rpg.ifi.uzh.ch/teaching.html). 
+The team consisted of (alphabetically): Zeno Hamers, Riccardo Maggioni, Augusto Mondelli and Nicola Taddei. Each team member's contributions can be seen on the GitHub page.
+The full report can be viewed here: 
 
-This code was developped on a Windows Laptop 
-System specifications: 16GB of RAM, 2.4Ghz intel i7 processor (13th Gen), 64-bit
-Before the code can be executed, the KITTI, MALAGA and parking datasets should be placed in this same repository under the name 'dataset-kitti', 'malaga-urban-dataset-extract-07' and 'parking' respectively.
-To run the code, run python src/main.py
-Relevant parameters can be adjusted in the config.yaml file. Voila!
+## Results
 
 
-The pipeline consists of the following segments:
-A Markovian, asynchronous architecture is implemented
 
-a - Initialization
-    1 - Establish keypoint correspondences between 2 manually selected frames (using patch matching or KLT)
-    2 - Triangulate a point cloud of 3D landmarks (implement 5-point or 8-point algorithm, 2D-2D)
+## Run instructions
+Before the code can be executed, the KITTI, MALAGA and parking datasets should be placed in this same repository under the name 'dataset-kitti', 'malaga-urban-dataset-extract-07' and 'parking' respectively. The datasets can be downloaded on the website of the Robotics and Perception Group (https://rpg.ifi.uzh.ch/teaching.html)
 
-    Classes:
-    - class Initialization
+To run the VO pipeline, run python "src/main.py". Relevant parameters can be adjusted in the config.yaml file. 
+The vo_pipeline.py file contains the modular subcomponents of which the Markovian VO pipeline is constructed. The visual.py file produces a 
+
+
+## VO Pipeline Architecture (Markovian)
+The VO pipeline is designed as a Markovian, asynchronous process. With every new frame the state is updated. The state consists of:
+1) detected keypoinys 'P' 
+2) the corresponding triangulated 3D landmarks 'X'
+
+To make sure that the triangulated 3D landmarks that we add to the state are accurate enough, the baseline between the corresponding frames should be high enough. To track this, the following extended state is updated after each frame:
+1) candidate keypoints 'C' (will be triangulated once this keypoint is successfully tracked for long enough) 
+2) first observations of the tracked keypoint 'F'
+3) camera pose at the first observation of the keypoint 'T'
+
+
+### Initialization
+
+    class VOInitializer():
+
+    1 - Establish keypoint correspondences between 2 manually selected bootstrap frames (using feature descriptor matching, SIFT detector and descriptor preferred)
+
+    2 - Estimate the camera pose of the second bootstrap frame (using the 5-point algorithm, 2D-2D, calibrated cameras)
+
+    3 - Triangulate the feature correspondences as 3D landmarks and add them to the state vector
+
     Input: 2 frames to initialize
-    Output: [S: state, Twc: transformation world-camera]
+    Output: [S: state, Twc: transformation world-camera of the second bootstrap frame]
 
 
-b - Continuous operation
-    1 - Estimate the position of the camera by associating keypoints in the current frame to previously triangulated 3D landmarks (P3P RANSAC)
+### Continuous operation
 
-    2 - Update 3D landmarks for keyframes (when the baseline treshold is met) 
+    class KeypointsToLandmarksAssociation():
 
-    Classes:
-    Master Class processFrame()
+    1 - Track the detected keypoints (and corresponding 3D landmarks) over multiple frames with the KLT  tracking algorithm (dense method)
 
-        - class FeatureExtraction
-        (performs feature extraction between 2 frames)
-        Input: previous frame I_i-1, state of the previous frame S_i-1, current frame I_i
-        Output: list of features
+    class PoseEstimator():
 
-        - class KeypointsToLandmarksAssociation
-        (Associats keypoints to existing landmarks)
-        Input: previous frame I_i-1, state of the previous frame S_i-1, current frame I_i, list of features
-        Output: dictionary with keypoints in frame i, associated to already identified 3D points 
+    2 - Estimate the position of the camera from the keypoint to landmark associations with the PnP RANSAC algorithm
 
-        - class NextPoseEstimator
-        (estimating the next pose, camera localization: P3P RANSAC)
-        Input: dictionary with keypoints and associated 3D points 
-        Output: pose Twc of frame i
-
-        ----------- Determine if the baseline is higher than the threshold ---------
-
-        - class NewLandmarksTriangulation
-        (triangulates new landmarks, asynchronously)
-        Input: 
-        P_i (the set of key points)
-        X_i (the set of 3D landmarks)
-        C_i (set of candidate keypoints for current frame)
-        Fi (set containing the first observation of the tracked keypoints)
-        Tau_i (camera pose at the first observation of the keypoint)
-        Output: list of new 3D points to add
-        -> put into buffer
+    class LandmarkTriangulator():
+    
+    3 - Triangulate new 3D landmarks when the baseline threshold is met for the canidate keypoints 'C' of the extended state
 
 
-Buffers: 
+## System specification
+This code was developped on a Windows PC with the following system specifications:
+ 16GB of RAM, 2.4Ghz intel i7 processor (13th Gen), 64-bit
 
-1 - the state S_i-1 from the previous frame, (to do pose estimation, maintaining Markovian principle)
-2 - complete history of detected 3D landmarks (useful for mapping and loop closure)
