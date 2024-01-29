@@ -1,7 +1,8 @@
-# BestVision
+# Locally Consistent Visual Odometry Pipeline
 In this repository, a locally consistent VO pipeline is built, implemented as a Markovian, asynchronous architecture.
 This project was completed as part of the Vision Algorithms for Mobile Robotics Course from Prof. Davide Scaramuzza at ETHZ and UZH (https://rpg.ifi.uzh.ch/teaching.html). 
 The team consisted of (alphabetically): Zeno Hamers, Riccardo Maggioni, Augusto Mondelli and Nicola Taddei. Each team member's contributions can be seen on the GitHub page.
+The visual odometry pipeline was tested on the KITTI, Malaga and Parking datasets (car-based).
 The full report can be viewed here: [Project Report](https://github.com/rickymaggio02/BestVision/blob/main/mini_project_VO_pipeline_Hamers_Maggioni_Mondelli_Taddei.pdf)
 
 ## Results
