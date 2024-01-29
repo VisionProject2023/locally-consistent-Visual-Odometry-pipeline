@@ -1,14 +1,33 @@
 
 # dataset choise
-dataset: 'kitti' # kitti, malaga or parking
+dataset: 'malaga' # kitti, malaga or parking
+
+
+# find new candidates method
+find_new_candidates_method: 'sift-sift' # 'shi-mask', 'sift-mask' or 'sift-sift'
 
 # initialization parameters
-init_detector_descriptor: 'sift'
+init_detector: 'sift'
+init_descriptor: 'sift'
 
 # debug
 debug: False
 
 # visualization
-visualization: True
+visualization: False
+animation: False
+
+# parameters for the sift-siftAf
+sift_alpha: 1 # 1 works well with KITTI, MALAGA and Parking
+sift_ransac_confidence: 0.99999
+
+# parameters for shi-mask:
+shi_alpha: 1.5 # 1.5 worked well with KITTI 
+shi_ransac_confidence: 0.999993 # 0.999993 worked well with KITTI (but no inliers around 600)
+
+
+# parameters for locally consistent sift-sift:
+# sift_alpha: 1
+# sift_ransac_confidence: 0.99999
 
 

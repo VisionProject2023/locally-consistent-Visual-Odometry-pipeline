@@ -1,10 +1,14 @@
 # BestVision
-Best project for vision course
 
-A Markovian, asynchronous architecture is implemented
+This code was developped on a Windows Laptop 
+System specifications: 16GB of RAM, 2.4Ghz intel i7 processor (13th Gen), 64-bit
+Before the code can be executed, the KITTI, MALAGA and parking datasets should be placed in this same repository under the name 'dataset-kitti', 'malaga-urban-dataset-extract-07' and 'parking' respectively.
+To run the code, run python src/main.py
+Relevant parameters can be adjusted in the config.yaml file. Voila!
 
 
 The pipeline consists of the following segments:
+A Markovian, asynchronous architecture is implemented
 
 a - Initialization
     1 - Establish keypoint correspondences between 2 manually selected frames (using patch matching or KLT)

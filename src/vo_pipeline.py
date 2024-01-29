@@ -5,6 +5,7 @@ from typing import Dict
 import cv2
 import yaml
 import pdb
+import os
 
 # type hinting guideline: images in openCV are numpy arrays
 
@@ -42,38 +43,21 @@ class BestVision():
         self.state = {'P': np.ndarray, 'X': np.ndarray} # 'P' (keypoints), 'X' (3D landmarks)
         self.extended_state = {'C' : np.ndarray,'F' : np.ndarray,'T' : np.ndarray}
 
-    def initialize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
-        '''
-        Initializes the state and returns the configuration of the second keyframe 
-        with respect to the first frame which configuration is considered as the world frame. This function makes the choice of which frame to use 
-        as second frame in initialization (for example the third frame in the sequence for th KITTY dataset as suggested)
+    # def initialize(img1: np.ndarray, img2: np.ndarray) -> np.ndarray:
+    #     '''
+    #     Initializes the state and returns the configuration of the second keyframe 
+    #     with respect to the first frame which configuration is considered as the world frame. This function makes the choice of which frame to use 
+    #     as second frame in initialization (for example the third frame in the sequence for th KITTY dataset as suggested)
 
-        Inputs: 
-            frame_sequence: List[ HxW np.ndarray ] a list of all the frames (or just the first n)
+    #     Inputs: 
+    #         frame_sequence: List[ HxW np.ndarray ] a list of all the frames (or just the first n)
 
-        Outputs:
-            T: 4x4 np.ndarray representing pose (T = [R|t]])
-            S: dictionary with keypoints 'P' (keys) and 3D landmarks 'X' (values) 
-        ''' 
+    #     Outputs:
+    #         T: 4x4 np.ndarray representing pose (T = [R|t]])
+    #         S: dictionary with keypoints 'P' (keys) and 3D landmarks 'X' (values) 
+    #     ''' 
     
-        pass
-    
-    def update_state(self, P: np.ndarray, X: np.ndarray):
-        self.state['P'] = P
-        self.state['X'] = X
-
-    def processFrame(new_frame: np.ndarray) -> np.ndarray:
-        '''
-        Takes as input a new frame and computes the pose of this frame. It also updates the stored 3D landmarks.
-
-        Inputs:
-            new_frame: HxW np.ndarray
-
-        Outputs:
-            T: 4x4 np.ndarray which encodes the new pose with respect to the world frame
-        '''
-        pass
-    
+    #     pass
 
 class VOInitializer():
     
@@ -116,50 +100,46 @@ class VOInitializer():
             good_kps_f2: array of keypoints in frame2
         '''
 
-        if config['init_detector_descriptor'] =='shi-tomasi-sift':
+        if config['init_detector'] =='shi':
             
             # Initialize feauture detector and descriptor
             # Shi-Tomashi corner detector, to test and figure out (will probably have to change the type of kps_f1 to cv.KeyPoint)
-            kps_f1 = cv2.goodFeaturesToTrack(frame1, maxCorners=100, qualityLevel=0.01, minDistance=10, mask=None, blockSize=3, gradientSize=3, useHarrisDetector=False, k=0.04)
-            kps_f2 = cv2.goodFeaturesToTrack(frame2, maxCorners=100, qualityLevel=0.01, minDistance=10, mask=None, blockSize=3, gradientSize=3, useHarrisDetector=False, k=0.04)
-            
+            kps_f1 = cv2.goodFeaturesToTrack(frame1, maxCorners=600, qualityLevel=0.03, minDistance=10, mask=None, blockSize=3, gradientSize=3, useHarrisDetector=False, k=0.04)
+            kps_f2 = cv2.goodFeaturesToTrack(frame2, maxCorners=600, qualityLevel=0.03, minDistance=10, mask=None, blockSize=3, gradientSize=3, useHarrisDetector=False, k=0.04)
+            # was at 400
             # Convert keypoints to cv2.KeyPoint format
             kps_f1 = [cv2.KeyPoint(x=pt[0][0], y=pt[0][1], size=20) for pt in kps_f1]
             kps_f2 = [cv2.KeyPoint(x=pt[0][0], y=pt[0][1], size=20) for pt in kps_f2]
             
+            
+        if config['init_detector'] == 'sift':
+
+            sift = cv2.SIFT.create()
+            kps_f1 = sift.detect(frame1, None)
+            kps_f2 = sift.detect(frame2, None)
+            
+            
+        if config['init_descriptor'] == 'sift':
+        
             # SIFT corner descriptor
             sift = cv2.SIFT.create()
-            des1 = sift.compute(frame1, kps_f1) # describes the features in frame 1
-            des2 = sift.compute(frame2, kps_f2) # describes the features in frame 2
-            
-            # des1 and des2 don't have the correct format here yet to be processed by bf.knnMatch
-            # this has to be figured out!
-            
-        if config['init_detector_descriptor'] == 'sift':
-            # All SIFT implementat  ion:
-            sift = cv2.SIFT.create()
-            kps_f1, des1 = sift.detectAndCompute(frame1, None)
-            kps_f2, des2 = sift.detectAndCompute(frame2, None)
-            
-        if config['init_detector_descriptor'] == 'orb':
-            # All ORB implementation:
-            orb = cv2.ORB.create()
-            kps_f1, des1 = orb.detectAndCompute(frame1, None)
-            kps_f2, des2 = orb.detectAndCompute(frame2, None)
-        
-        # Feature matching (compare the descriptors, brute force)
-        bf = cv2.BFMatcher.create(cv2.NORM_L2, crossCheck=False) # crossCheck=True is an alternative to the ratiotest (proposed by D. Lowe in SIFT paper)	
-        kp_matches = bf.knnMatch(des1, des2, k=2) # k=2: return the two best matches for each descriptor
+            _, des1 = sift.compute(frame1, kps_f1) # describes the features in frame 1
+            _, des2 = sift.compute(frame2, kps_f2) # describes the features in frame 2
+    
+            # Feature matching (compare the descriptors, brute force)
+            bf = cv2.BFMatcher.create(cv2.NORM_L2, crossCheck=False) # crossCheck=True is an alternative to the ratiotest (proposed by D. Lowe in SIFT paper)	
+            kp_matches = bf.knnMatch(des1, des2, k=2) # k=2: return the two best matches for each descriptor
 
-        # Apply ratio test (preventing false matches)
-        good_kp_matches = []
-        for m,n in kp_matches:
-            if m.distance < 0.8*n.distance: # "distance" = distance function = how similar are the descriptors
-                good_kp_matches.append(m)
+            # Apply ratio test (preventing false matches)
+            good_kp_matches = []
+            for m,n in kp_matches:
+                if m.distance < 0.8*n.distance: # "distance" = distance function = how similar are the descriptors
+                    good_kp_matches.append(m)
                        
-        # convert kp matches to lists
-        good_kps_f1 = np.array([kps_f1[match.queryIdx].pt for match in good_kp_matches])
-        good_kps_f2 = np.array([kps_f2[match.trainIdx].pt for match in good_kp_matches])
+            # convert kp matches to lists
+            good_kps_f1 = np.array([kps_f1[match.queryIdx].pt for match in good_kp_matches])
+            good_kps_f2 = np.array([kps_f2[match.trainIdx].pt for match in good_kp_matches])
+            
   
         # return the good tracking points of the old and the new frame
         return good_kps_f1, good_kps_f2
@@ -217,10 +197,8 @@ class VOInitializer():
         # state = {tuple(map(tuple, key)): value[:3]/value[3] for key, value in zip(zip(kps_1, kps_2), XH)} #add 3D points to the state, convert to euclidean coordinates, converts kps into tuples
         state['X'] = (XH[:,0:3].T / XH[:,3].T).T
         state['P'] = kps_1      
-        # -> feature to work on!
         
-        return state  #future improvement: try out .astype(np.float32)
-
+        return state  
 
 class KeypointsToLandmarksAssociator():
     def __init__(self, K, current_pose):
@@ -229,10 +207,7 @@ class KeypointsToLandmarksAssociator():
         '''
         self.K = K
         self.current_pose = current_pose
-        # in order to use the 1 point ransac I have to keep track of the last pose (pose of second frame 
-        # must be given in the init).
-        # current_pose is a Homo matrix that performs a change of basis from the first 
-        # camera's coordinate system to the second camera's coordinate system
+
 
     def associateKeypointsToLandmarks(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict) -> dict:
         '''
@@ -259,18 +234,31 @@ class KeypointsToLandmarksAssociator():
               status -> vector with 1 if corresponding feature has been found, 0 if not
               error -> output vector of errors
         '''
-        
+
         state['P'] = state['P'].astype(np.float32)
-        keypoints, status, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, state['P'], None)
+        next_points, status, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, state['P'], None)
         filter_well_tracked = np.hstack(status).astype(np.bool_)
-        
         filter_tracking_lost = np.logical_not(filter_well_tracked)
-        points_tracking_lost = keypoints[filter_tracking_lost]
+        points_tracking_lost = next_points[filter_tracking_lost]
+        #calculate reprojection error -------------
+        # points_reprojected, state2, err2 = cv2.calcOpticalFlowPyrLK(new_frame, old_frame, next_points, None)
+        # d = np.linalg.norm(state['P'] - points_reprojected, axis = 1)
+        # reproj_threshold = 30
+        # filter_reproj = d < reproj_threshold
+        #filter based on the image shape
+        # filter_u_min = (next_points[:,0] > 0)
+        # filter_u_max = (next_points[:,0]< new_frame.shape[0])
+        # filter_u_max = np.logical_and(filter_u_min, filter_u_max)
+        # filter_v_min = (next_points[:,1] > 0)
+        # filter_v_max = (next_points[:,1] < new_frame.shape[1])
+        # filter_v_max = np.logical_and(filter_v_min, filter_v_max)
+        #filter based on the status
+        # filter_total = np.logical_and(filter_u_max, filter_well_tracked)
+        # filter_total = np.logical_and(filter_u_max, filter_total)
+        # filter_total = np.logical_and(filter_v_max, filter_total)
         
-        # tracked keypoints
-        keypoints_well_tracked = keypoints[filter_well_tracked]
-        
-        # associate the tracked keypoint to the same 3D landmark
+        keypoints_well_tracked = next_points[filter_well_tracked]
+
         landmarks_corresponding = state['X'][filter_well_tracked]
         
         # define the new state
@@ -328,7 +316,6 @@ class KeypointsToLandmarksAssociator():
         # plt.legend() # Show legend
         # plt.show() # Show the plot
 
-
         # #I obtain a matrix from origin coordinates to current pose coordinate
         # proj_points, jacob = cv2.projectPoints(state_found_x, hom_inv[0:3,0:3], hom_inv[0:3,3], self.K, None)
         # proj_points = np.reshape(proj_points, (proj_points.shape[0], proj_points.shape[-1]))
@@ -371,10 +358,14 @@ class PoseEstimator():
         self.K = K
 
         """ Constants """
-        self.REPOJ_THRESH = 2     # was 2, threshold on the reprojection error of points accepted as inliers
-        self.CONFIDENCE = 0.99999   # dsired confidence of result
+        self.REPOJ_THRESH = 2    # was 2, threshold on the reprojection error of points accepted as inliers
+        self.CONFIDENCE = 0.99999   # desired confidence of result
+        if config['find_new_candidates_method'] == 'sift-sift':
+            self.CONFIDENCE = config['sift_ransac_confidence']
+        if config['find_new_candidates_method'] == 'shi-mask':
+            self.CONFIDENCE = config['shi_ransac_confidence']
     
-    def estimatePose(self, associations: Dict[np.ndarray,np.ndarray]) -> np.ndarray:
+    def estimatePose(self, associations: Dict[np.ndarray,np.ndarray], img_idx) -> np.ndarray:
         '''
         Computes the current pose from the associations found in previous steps
 
@@ -398,23 +389,73 @@ class PoseEstimator():
         R, _ = cv2.Rodrigues(R_vec)
         print("real angle ", np.arccos(R[0,0]) * 180 / np.pi)
         # add nonlinear refinement with --> solvePnPRefineLM
-        if inliers is not None:
-            if len(inliers) < 4:
-                print('less than 4 inliers! len(inliers) = ', len(inliers))
-            inliers = np.hstack(inliers)
-            print(inliers[0:10])
-            print("shape pre modifia ", associations['X'].shape)
-            associations['P'] = associations['P'][inliers,:]
-            associations['X'] = associations['X'][inliers,:]
-            print("shape pos modifia ", associations['X'].shape)
-            T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([[0,0,0,1]])], axis=0)
-        
         
         if inliers is None:
-            print('Error: no inliers found! T can not be calculated')
+            inliers = np.array([])
+        print('len inliers', len(inliers))
         
-        return T
+        if len(inliers) < 4:
+            print('less than 4 inliers (or None)! len(inliers) = ', len(inliers))
+            
+            # there need to be more keypoints to estimate the pose accurately
+            # add brand new landmarks and keypoints to the state -> initialization
+            
+            # instantiate the VOInitializer
+            VOInit = VOInitializer(self.K)
 
+            # load current frame
+            # load frame 4 steps in the future
+            if config['dataset'] == 'kitti':
+                kitti_path = 'kitti-dataset'  # replace with your path
+                cur_frame = cv2.imread(f'{kitti_path}/05/image_0/{img_idx:06d}.png', cv2.IMREAD_GRAYSCALE)
+                next_bootstrap_frame = cv2.imread(f'{kitti_path}/05/image_0/{img_idx+4:06d}.png', cv2.IMREAD_GRAYSCALE)
+                
+            elif config['dataset'] == 'malaga':
+                malaga_path = 'malaga-urban-dataset-extract-07'  # replace with your path
+                left_images = [img for img in os.listdir(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images') if img.endswith('left.jpg')]
+                left_images.sort()
+                cur_frame = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[img_idx]}', cv2.IMREAD_GRAYSCALE)
+                next_bootstrap_frame = cv2.imread(f'{malaga_path}/malaga-urban-dataset-extract-07_rectified_800x600_Images/{left_images[img_idx+4]}', cv2.IMREAD_GRAYSCALE)
+                
+            elif config['dataset'] == 'parking':
+                parking_path = 'parking'  # replace with your path
+                cur_frame = cv2.imread(f'{parking_path}/images/img_{img_idx:05d}.png', cv2.IMREAD_GRAYSCALE)
+                next_bootstrap_frame = cv2.imread(f'{parking_path}/images/img_{img_idx+4:05d}.png', cv2.IMREAD_GRAYSCALE)
+
+            else:
+                raise ValueError("Invalid dataset selection")
+            
+            # detect, describe and match features
+            kps_1, kps_2 = VOInit.getKeypointMatches(cur_frame, next_bootstrap_frame)
+            print("len kps1", kps_1.shape)
+            print("len kps2", kps_2.shape)
+
+            # estimate pose
+            img1_img2_pose_tranform, mask = VOInit.getPoseEstimate(kps_1, kps_2)
+            mask = np.hstack(mask).astype(np.bool_)
+
+            # triangulate landmarks, img1 and img2 are assumed to be far enough apart for accurate triangulation
+            kps_1 = kps_1[mask, :]
+            kps_2 = kps_2[mask,:]
+            state = VOInit.get_2D_3D_landmarks_association(kps_1, kps_2, img1_img2_pose_tranform)
+            
+            # add the landmarks (state['X']) to the associations
+            associations['X'] = np.vstack((associations['X'], state['X']))
+            
+            # add the keypoints of the current frame (kps_1) to the associations
+            associations['P'] = np.vstack((associations['P'], kps_1))
+            return self.estimatePose(associations, img_idx)
+            
+
+        inliers = np.hstack(inliers)
+        print(inliers[0:10])
+        print("shape pre modifia ", associations['X'].shape)
+        associations['P'] = associations['P'][inliers,:]
+        associations['X'] = associations['X'][inliers,:]
+        print("shape pos modifia ", associations['X'].shape)
+        T = np.concatenate([np.concatenate([R,t], axis=-1),np.array([[0,0,0,1]])], axis=0)
+    
+        return T
 
 class LandmarkTriangulator():
     def __init__(self, K, old_des):
@@ -424,10 +465,57 @@ class LandmarkTriangulator():
         self.K = K
         self.old_des = old_des
 
-        pass
+    def find_new_candidates_shi(self, new_frame: np.ndarray, state: dict, keypoints_well_tracked) -> list: 
+        
+        # make a mask (type  type uint8/logical), exclude the well_tracked pixels from the Shi-Tomashi corner detector
+        mask = np.ndarray(shape=(new_frame.shape[0], new_frame.shape[1]), dtype=np.uint8)
+        # turn all the mask values to 255 by default
+        mask.fill(255)
+        # turn the mask to zero at the pixel positions of keypoints_well_tracked
+        for i in range(len(keypoints_well_tracked)):
+            y, x = int(keypoints_well_tracked[i][1]), int(keypoints_well_tracked[i][0])
+            if 0 <= y < mask.shape[0] and 0 <= x < mask.shape[1]:
+                mask[y, x] = 0
+        
+        
+        #Shi-Tomashi corner detector, to test and figure out (will probably have to change the type of kps_f1 to cv.KeyPoint)
+        new_keypoints = cv2.goodFeaturesToTrack(new_frame, maxCorners=500, qualityLevel=0.03, minDistance=10, mask=mask, blockSize=4, gradientSize=3, useHarrisDetector=False, k=0.04)
+        # was at 1000
+        
+        #Convert keypoints to cv2.KeyPoint format
+        new_keypoints = [cv2.KeyPoint(x=pt[0][0], y=pt[0][1], size=20) for pt in new_keypoints]
+        new_keypoints = np.array([kp.pt for kp in new_keypoints])
+        
+        non_duplicate_new_keypoints = new_keypoints
 
-    def find_new_candidates(self, new_frame: np.ndarray, state: dict, extended_state: dict) -> list:
-        # we should try a KLT implementation for this!
+
+        return non_duplicate_new_keypoints
+
+    def find_new_candidates_sift_mask(self, new_frame: np.ndarray, state: dict, keypoints_well_tracked) -> list: 
+        debug = False
+        
+        # make a mask (type  type uint8/logical), exclude the well_tracked pixels from the Shi-Tomashi corner detector
+        mask = np.ndarray(shape=(new_frame.shape[0], new_frame.shape[1]), dtype=np.uint8)
+        # turn all the mask values to 255 by default
+        mask.fill(255)
+        # turn the mask to zero at the pixel positions of keypoints_well_tracked
+        for i in range(len(keypoints_well_tracked)):
+            y, x = int(keypoints_well_tracked[i][1]), int(keypoints_well_tracked[i][0])
+            if 0 <= y < mask.shape[0] and 0 <= x < mask.shape[1]:
+                mask[y, x] = 0
+        
+        # Use the sift descriptor to describe the new keypoints
+        sift = cv2.SIFT.create()
+        
+        new_keypoints = sift.detect(new_frame, mask=mask) # describes the features in frame 1
+        #new_keypoints, cur_des = sift.detectAndCompute(new_frame, mask=mask) # describes the features in frame 1
+
+        new_keypoints = np.array([kp.pt for kp in new_keypoints])
+        non_duplicate_new_keypoints = new_keypoints
+
+        return non_duplicate_new_keypoints
+    
+    def find_new_candidates_sift_sift(self, new_frame: np.ndarray, state: dict, extended_state: dict) -> list:
         
         debug = False
         
@@ -439,10 +527,7 @@ class LandmarkTriangulator():
         kp_matches = bf.knnMatch(self.old_des, cur_des, k=2) # k=2: return the two best matches for each descriptor
 
         # Apply ratio test (preventing false matches)
-        good_kp_matches = []
-        for m,n in kp_matches:
-            if m.distance < 0.8*n.distance: # "distance" = distance function = how similar are the descriptors
-                good_kp_matches.append(m)
+        good_kp_matches = [m for m, n in kp_matches if m.distance < 0.8 * n.distance]
 
         # new_keypoints -> the good matches that didn't appear in the previous (old) image
         old_keypoints = np.array([keypoints[match.trainIdx].pt for match in good_kp_matches])
@@ -450,45 +535,18 @@ class LandmarkTriangulator():
         mask = np.isin(keypoints, old_keypoints, invert=True).all(axis=1)
         new_keypoints = keypoints[mask]
         
-        # # divide the keypoints into new ones and already existing ones
-        # if len(extended_state['C']) > 0:
-        #     known_points = np.concatenate((state['P'], extended_state['C']), axis=0)
-        # else:
-        #     known_points = state['P']
 
-        if debug:
-            print("\n---- FIND NEW CANDIDATES ----")
-            print(f"keypoints: {keypoints}")
-            print(f"old_keypoints: {old_keypoints}")
-            print(f"len(state['P']): {len(state['P'])}")
-            print(f"len(keypoints): {len(keypoints)}")
-            print(f"mask: {mask}")
-            print(f"new_kp: {new_keypoints}")
+        # if debug:
+        #     print("\n---- FIND NEW CANDIDATES ----")
+        #     print(f"keypoints: {keypoints}")
+        #     print(f"old_keypoints: {old_keypoints}")
+        #     print(f"len(state['P']): {len(state['P'])}")
+        #     print(f"len(keypoints): {len(keypoints)}")
+        #     print(f"mask: {mask}")
+        #     print(f"new_kp: {new_keypoints}")
 
         return (new_keypoints, cur_des)
-    
-    def find_new_candidates_2(self, new_frame: np.ndarray, state: dict, extended_state: dict, keypoints_well_tracked) -> list: 
-    
-        # Shi-Tomashi corner detector, to test and figure out (will probably have to change the type of kps_f1 to cv.KeyPoint)
-        new_keypoints = cv2.goodFeaturesToTrack(new_frame, maxCorners=100, qualityLevel=0.02, minDistance=10, mask=None, blockSize=4, gradientSize=3, useHarrisDetector=False, k=0.04)
         
-        # remove one dimension
-        new_keypoints = np.squeeze(new_keypoints)
-        
-        # Convert keypoints to cv2.KeyPoint format
-        #new_keypoints = [cv2.KeyPoint(x=pt[0][0], y=pt[0][1], size=20) for pt in new_keypoints]
-    
-        for keypoint_well_tracked in keypoints_well_tracked:
-            # check how close the new keypoints are to the old ones (distance < 2)
-            distance = [np.sqrt((keypoint_well_tracked[0] - new_keypoints[i][0])**2 + ((keypoint_well_tracked[1] - new_keypoints[i][1]))**2) < 2 for i in range(len(new_keypoints))]
-            # remove the keypoints that are too close to the old ones
-            new_keypoints = [new_keypoints[i] for i in range(len(new_keypoints)) if distance[i] == True]
-            
-        #kps_f1_KLT = cv2.KeyPoint_convert(kps_f1) # Convert to Point2f format for KLT tracker
-        
-    
-        return new_keypoints
-
 
     def triangulate_landmark(self, old_frame: np.ndarray, new_frame: np.ndarray, state: dict, extended_state: dict, new_pose) -> dict:
         '''
@@ -504,12 +562,8 @@ class LandmarkTriangulator():
         Output:
             new_landmarks: dictionary with keys 'P' and 'X'  for the new identified landmarks
         '''
-
-        # idea: add an if statement that the sift descriptor matching approach will be executed when the optical flow fails
-
         
         # ATTENTION: construct extended_state['T'] as a three-dimensional vector (K,4,4) !!!
-
         
         # keypoints_tracking_lost are the keypoints in the previous image that could not be tracked to the new image during KLT
         
@@ -528,7 +582,7 @@ class LandmarkTriangulator():
 
         debug = False
         debug2 = False
-        print("\n\n---------- TRIANGULATE LANDMARK ----------")
+        # print("\n\n---------- TRIANGULATE LANDMARK ----------")
 
         # 1) Track and update the existing candidate keypoints (from frame to frame)
         candidate_keypoints_1 = extended_state['C'].astype(np.float32)
@@ -544,6 +598,7 @@ class LandmarkTriangulator():
         if len(candidate_keypoints_1)>0:
 
             candidate_keypoints_2, st, err = cv2.calcOpticalFlowPyrLK(old_frame, new_frame, candidate_keypoints_1, None)
+            # candidate_keypoints_2 is in floating values and depict the pixel coordinates of the next image (the can fall outside of the normal image boundaries)
             st = np.hstack(st).astype(np.bool_)
             if candidate_keypoints_2 is not None:
                 candidate_keypoints_2_well_tracked = candidate_keypoints_2[st==1]
@@ -552,6 +607,8 @@ class LandmarkTriangulator():
                 
             if len(candidate_keypoints_1_well_tracked) != len(candidate_keypoints_2_well_tracked):
                 print(f"ERROR: candidate_keypoints_1_well_tracked and candidate_keypoints_2_well_tracked do not have the same length. len(candidate_keypoints_1_well_tracked)={len(candidate_keypoints_1_well_tracked)}!={len(candidate_keypoints_2_well_tracked)}=len(candidate_keypoints_2_well_tracked)")
+                print("stop!!!")
+                
             if debug:
                 print("\n---- TRACK CANDIDATE KEYPOINTS ----")
                 print(f"candidate_keypoints_2: {candidate_keypoints_2}")
@@ -559,7 +616,10 @@ class LandmarkTriangulator():
                 print(f"candidate_keypoints_1_well_tracked: {candidate_keypoints_1_well_tracked}")
 
             # Create a boolean mask to identify the positions of the tracked candidate keypoints to be updated
-            mask = np.isin(extended_state['C'], candidate_keypoints_1_well_tracked).all(axis=1)
+            if config['find_new_candidates_method'] == 'shi-mask':
+                mask = np.isin(candidate_keypoints_2, candidate_keypoints_2_well_tracked).all(axis=1)
+            if config['find_new_candidates_method'] == 'sift-sift':
+                mask = np.isin(extended_state['C'], candidate_keypoints_1_well_tracked).all(axis=1)
             extended_state['C'][mask] = candidate_keypoints_2_well_tracked # Update all the candidate keypoints that have been retracked
 
             len_ckC_step3 = len(extended_state['C'])
@@ -598,10 +658,19 @@ class LandmarkTriangulator():
                 print(f"len(extended_state['T']) dopo rimozione untracked: {len(extended_state['T'])}")
                 
         if len(candidate_keypoints_1)==0:
-            candidate_keypoints_2_well_tracked = []
+            candidate_keypoints_1_well_tracked = []
 
         # 2) Add new candidate keypoints
-        new_candidates_list, cur_des = self.find_new_candidates(new_frame, state, extended_state) #, candidate_keypoints_2_well_tracked)
+        new_candidates_list = []
+        cur_des = []
+        if config['find_new_candidates_method'] == 'shi-mask':
+            new_candidates_list = self.find_new_candidates_shi(new_frame, state, candidate_keypoints_1_well_tracked)
+        elif config['find_new_candidates_method'] == 'sift-mask':
+            new_candidates_list = self.find_new_candidates_sift_mask(new_frame, state, candidate_keypoints_1_well_tracked)
+        elif config['find_new_candidates_method'] == 'sift-sift':
+            new_candidates_list, cur_des = self.find_new_candidates_sift_sift(new_frame, state, extended_state)
+            
+        
         if debug:
             print(f"new candidates list: {new_candidates_list}")
             
@@ -634,8 +703,13 @@ class LandmarkTriangulator():
                 print(f"len(extended_state['T']) dopo add new: {len(extended_state['T'])}")
 
 
-        # VALIDATE NEW POINTS -> add them as keypoints for triangulation
+        # 3) validate new points (when the baseline is big enough to produce accurate triangulation) (from candidate keypoints to real keypoints used for triangulation)
         treshold = 1
+        if config['find_new_candidates_method'] == 'sift-sift':
+            treshold = config['sift_alpha']
+        if config['find_new_candidates_method'] == 'shi-mask':
+            treshold = config['shi_alpha']
+        
         #debug
         alphas = []
         indices_to_validate = []
